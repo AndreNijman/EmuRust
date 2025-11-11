@@ -46,9 +46,9 @@ cargo run --release -- ./tetris.gb --interactive --limit-fps --scale 4
 - `--interactive` opens the SDL2 window and streams frames in real time.
 - `--limit-fps` enables vsync (~60 FPS). Omit it to run as fast as possible.
 - `--scale` resizes the window (`1`, `2`, `4`, `8`, …). Use `--scale 1` for native 160×144 output.
-- `--ai` enables the experimental AI controller pipeline (currently a stub). When active, the emulator
-  begins capturing Game Boy Tetris RAM (playfield, level, lines, next piece) each frame and logging
-  summary stats so future learning agents can act on the state.
+- `--ai` enables the experimental AI controller. It currently presses random directions to keep the
+  pipeline exercised, captures Game Boy Tetris RAM every frame, logs summaries, and (optionally)
+  writes JSONL datasets when `--ai-log path` is provided. Use `--ai-seed` for reproducible runs.
 - Audio is streamed automatically through SDL2, so if your system audio is configured you should
   hear the ROM immediately.
 
@@ -118,6 +118,10 @@ available:
     at `0xC0A0` (10×20 board) and various gameplay flags sit near `0xC200`, but you can point watches
     at any RAM location you need.
 
+3. **AI dataset logging** – with `--ai --ai-log ai.jsonl` the controller records each frame’s RAM
+   snapshot plus the action it chose as JSON lines. This is a convenient starting point for training
+   agents offline without instrumenting the emulator further.
+
 ### CLI reference
 
 | Flag | Default | Description |
@@ -126,6 +130,9 @@ available:
 | `--frames <n>` | `60` | Frames to execute; `0` = infinite. Ignored if `--interactive` is set. |
 | `--cycles <n>` | *none* | Execute precise CPU cycles instead of frames. |
 | `--interactive` | off | Launch SDL window and enable keyboard controls. |
+| `--ai` | off | Run the experimental AI controller (requires `--interactive`). |
+| `--ai-log <path>` | *none* | When `--ai` is on, stream AI observations/actions to this JSONL file. |
+| `--ai-seed <n>` | *none* | Set the AI RNG seed for reproducible experiments. |
 | `--scale <n>` | `4` | Window scale factor in interactive mode. |
 | `--limit-fps` | off | Enable vsync/60 FPS cap in interactive mode. |
 

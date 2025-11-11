@@ -102,7 +102,7 @@ impl InteractiveRunner {
             }
 
             if let Some(controller) = ai.as_deref_mut() {
-                controller.tick(gameboy);
+                controller.tick(gameboy)?;
             }
 
             self.emulate_frame(gameboy, audio, recorder.as_deref_mut())?;

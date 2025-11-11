@@ -13,7 +13,7 @@ use clap::Parser;
 use gameboy_core::Gameboy;
 use gameboy_core::emulator::step_result::StepResult;
 
-use crate::ai::AiController;
+use crate::ai::{AiConfig, AiController};
 use crate::audio::AudioPlayer;
 use crate::automation::{
     AutomationRecorder, DumpFormat, MemoryRange, WatchFormat, WatchOutput, WatchSpec,
@@ -80,6 +80,14 @@ struct Cli {
     /// Enable experimental AI controller (currently placeholder)
     #[arg(long)]
     ai: bool,
+
+    /// Optional path to log AI observations/actions (JSON lines)
+    #[arg(long, requires = "ai")]
+    ai_log: Option<PathBuf>,
+
+    /// Seed for the AI RNG
+    #[arg(long, requires = "ai")]
+    ai_seed: Option<u64>,
 }
 
 fn main() -> Result<()> {
@@ -142,7 +150,11 @@ fn build_recorder(cli: &Cli) -> Result<Option<AutomationRecorder>> {
 
 fn build_ai(cli: &Cli) -> Result<Option<AiController>> {
     if cli.ai {
-        Ok(Some(AiController::new()))
+        let config = AiConfig {
+            seed: cli.ai_seed,
+            log_path: cli.ai_log.clone(),
+        };
+        Ok(Some(AiController::new(config)?))
     } else {
         Ok(None)
     }
@@ -161,7 +173,7 @@ fn run_headless(
     if let Some(cycles) = cli.cycles {
         for _ in 0..cycles {
             if let Some(controller) = ai.as_deref_mut() {
-                controller.tick(gameboy);
+                controller.tick(gameboy)?;
             }
             match gameboy.emulate(&mut display) {
                 StepResult::AudioBufferFull => audio.push_samples(gameboy.get_audio_buffer()),
@@ -180,7 +192,7 @@ fn run_headless(
     if cli.frames == 0 {
         loop {
             if let Some(controller) = ai.as_deref_mut() {
-                controller.tick(gameboy);
+                controller.tick(gameboy)?;
             }
             match gameboy.emulate(&mut display) {
                 StepResult::AudioBufferFull => audio.push_samples(gameboy.get_audio_buffer()),
@@ -198,7 +210,7 @@ fn run_headless(
     let mut remaining = cli.frames;
     while remaining > 0 {
         if let Some(controller) = ai.as_deref_mut() {
-            controller.tick(gameboy);
+            controller.tick(gameboy)?;
         }
         match gameboy.emulate(&mut display) {
             StepResult::VBlank => {
