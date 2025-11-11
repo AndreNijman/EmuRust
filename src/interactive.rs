@@ -45,7 +45,10 @@ impl InteractiveRunner {
         if limit_fps {
             canvas_builder = canvas_builder.present_vsync();
         }
-        let canvas = canvas_builder.build().map_err(|e| anyhow!(e))?;
+        let mut canvas = canvas_builder.build().map_err(|e| anyhow!(e))?;
+        canvas
+            .set_logical_size(WIDTH as u32, HEIGHT as u32)
+            .context("failed to set logical size")?;
 
         let texture_creator = canvas.texture_creator();
         let texture = texture_creator
