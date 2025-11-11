@@ -52,8 +52,8 @@ fn main() -> Result<()> {
 
     match detect_system(&rom_path)? {
         GameSystem::GameBoy => run_gameboy(&rom_path, &cli),
-        GameSystem::Nes => nes::run(&rom_path),
-        GameSystem::Snes => snes::run(&rom_path),
+        GameSystem::Nes => nes::run(&rom_path, cli.scale, cli.limit_fps),
+        GameSystem::Snes => snes::run(&rom_path, cli.scale, cli.limit_fps),
     }
 }
 

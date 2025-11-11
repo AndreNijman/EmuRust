@@ -11,6 +11,9 @@ env_logger = "0.11"
 gameboy_core = "0.3.3"
 log = "0.4"
 sdl2 = { version = "0.36", features = ["use-pkgconfig", "unsafe_textures"] }
+gc_nes_core = "0.1"
+meru-interface = "0.3"
+super-sabicom = "0.2"
 
 [patch.crates-io]
 gameboy_core = { path = "crates/gameboy_core" }
