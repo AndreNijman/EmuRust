@@ -14,7 +14,8 @@ used.
 - Real-time audio playback streamed through SDL2 (stereo f32 output)
 - Headless CLI options for deterministic frame or cycle counts (useful for automation/tests)
 - Friendly command-line interface (`clap`) and logging (`env_logger`)
-- Simple code layout for future extensions (audio streaming, savestates, web builds, etc.)
+- Memory introspection hooks (one-shot dumps + per-frame watch streams for automation/bots)
+- Simple code layout for future extensions (savestates, configurable input, web builds, etc.)
 
 ## Requirements
 
@@ -74,6 +75,45 @@ cargo run -- ./tetris.gb --frames 0
 
 Audio output remains enabled in headless mode, so you'll still hear the ROM unless you mute the
 system output.
+
+### Memory dumps and automation feeds
+
+Tetris automation (or any ROM analysis) typically needs the raw RAM/VRAM contents. Two helpers are
+available:
+
+1. **One-shot dumps** – capture any address range after the run completes:
+
+    ```bash
+    # Dump 0x200 bytes starting at 0xC000 as a hex table
+    cargo run -- ./tetris.gb --frames 120 --dump-range 0xC000:0x200
+
+    # Same dump, but write raw binary bytes to a file
+    cargo run -- ./tetris.gb --frames 120 \
+      --dump-range 0xC000:0x200 \
+      --dump-output wram.bin \
+      --dump-format binary
+    ```
+
+2. **Live watch stream** – emit JSON lines after every VBlank with the bytes you care about. This
+   is ideal for connecting external automation/bot processes:
+
+    ```bash
+    # Stream Game Boy Tetris playfield (10x20 bytes at 0xC0A0) + next-piece state
+    cargo run --release -- ./tetris.gb --interactive \
+      --watch board:0xC0A0:200 \
+      --watch state:0xC200:32 \
+      --watch-output tetris_watches.jsonl
+    ```
+
+    Each line looks like:
+
+    ```json
+    {"frame":128,"watches":[{"name":"board","start":49248,"data_hex":"000000..."}]}
+    ```
+
+    Use hex addresses or decimal; lengths accept the same. For Game Boy Tetris the playfield lives
+    at `0xC0A0` (10×20 board) and various gameplay flags sit near `0xC200`, but you can point watches
+    at any RAM location you need.
 
 ### CLI reference
 
