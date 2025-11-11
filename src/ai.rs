@@ -4,8 +4,8 @@ use std::path::PathBuf;
 
 use gameboy_core::{Button, Gameboy};
 use log::info;
-use rand::rngs::SmallRng;
 use rand::SeedableRng;
+use rand::rngs::SmallRng;
 use serde::Serialize;
 
 const BOARD_ADDR: u16 = 0xC0A0; // 10x20 playfield in Game Boy Tetris
@@ -41,6 +41,7 @@ pub enum AiAction {
     Left,
     Right,
     Down,
+    Start,
 }
 
 impl AiAction {
@@ -50,6 +51,7 @@ impl AiAction {
             AiAction::Left => Some(Button::Left),
             AiAction::Right => Some(Button::Right),
             AiAction::Down => Some(Button::Down),
+            AiAction::Start => Some(Button::Start),
         }
     }
 }
@@ -61,6 +63,7 @@ pub struct AiController {
     latest: Option<GameObservation>,
     rng: SmallRng,
     logger: Option<BufWriter<File>>,
+    start_counter: u8,
 }
 
 impl AiController {
@@ -78,6 +81,7 @@ impl AiController {
             latest: None,
             rng: SmallRng::seed_from_u64(seed),
             logger,
+            start_counter: 4,
         })
     }
 
@@ -87,7 +91,12 @@ impl AiController {
         let observation = capture_observation(gameboy, self.frame_count);
         self.maybe_log_summary(&observation);
 
-        let action = self.decide();
+        let action = if self.start_counter > 0 {
+            self.start_counter -= 1;
+            AiAction::Start
+        } else {
+            self.decide()
+        };
         self.apply_action(gameboy, action);
         self.write_dataset_entry(&observation, action)?;
         self.latest = Some(observation);
