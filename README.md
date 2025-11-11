@@ -1,6 +1,6 @@
 # Game Boy Emulator (Rust)
 
-Modern rewrite of the emulator using Rust and the
+This emulator is built in Rust on top of the
 [`gameboy_core`](https://crates.io/crates/gameboy_core) library. The heavy lifting (CPU/PPU/APU,
 MBCs, timers) comes from the upstream crate, while this repository provides a fast SDL2 renderer,
 keyboard controls, and a flexible CLI for running ROMs headlessly or interactively. The interactive
