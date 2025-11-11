@@ -1,0 +1,13 @@
+[package]
+name = "gameboy"
+version = "0.2.0"
+edition = "2024"
+
+[dependencies]
+anyhow = "1.0"
+bytemuck = { version = "1.16", features = ["extern_crate_alloc"] }
+clap = { version = "4.5", features = ["derive"] }
+env_logger = "0.11"
+gameboy_core = "0.3.3"
+log = "0.4"
+sdl2 = { version = "0.36", features = ["use-pkgconfig", "unsafe_textures"] }

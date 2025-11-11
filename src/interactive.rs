@@ -1,0 +1,157 @@
+use std::collections::HashSet;
+use std::time::{Duration, Instant};
+
+use anyhow::{anyhow, Context, Result};
+use gameboy_core::Gameboy;
+use gameboy_core::button::Button;
+use gameboy_core::emulator::step_result::StepResult;
+use sdl2::event::Event;
+use sdl2::keyboard::Keycode;
+use sdl2::pixels::PixelFormatEnum;
+use sdl2::render::{Canvas, Texture};
+use sdl2::video::Window;
+
+use crate::display::{FrameBuffer, HEIGHT, WIDTH};
+
+const TARGET_FRAME: Duration = Duration::from_micros(16_667);
+
+pub struct InteractiveRunner {
+    _sdl: sdl2::Sdl,
+    canvas: Canvas<Window>,
+    texture: Texture,
+    event_pump: sdl2::EventPump,
+    framebuffer: FrameBuffer,
+    pressed: HashSet<Button>,
+    limit_fps: bool,
+}
+
+impl InteractiveRunner {
+    pub fn new(title: &str, scale: u32, limit_fps: bool) -> Result<Self> {
+        let sdl = sdl2::init().map_err(|e| anyhow!(e))?;
+        let video = sdl.video().map_err(|e| anyhow!(e))?;
+        let scaled_w = (WIDTH as u32).saturating_mul(scale.max(1));
+        let scaled_h = (HEIGHT as u32).saturating_mul(scale.max(1));
+        let window = video
+            .window(title, scaled_w, scaled_h)
+            .position_centered()
+            .resizable()
+            .build()
+            .context("failed to create SDL window")?;
+
+        let mut canvas_builder = window.into_canvas();
+        if limit_fps {
+            canvas_builder = canvas_builder.present_vsync();
+        }
+        let canvas = canvas_builder.build().map_err(|e| anyhow!(e))?;
+
+        let texture_creator = canvas.texture_creator();
+        let texture = texture_creator
+            .create_texture_streaming(PixelFormatEnum::ARGB8888, WIDTH as u32, HEIGHT as u32)
+            .map_err(|e| anyhow!(e))?;
+
+        let event_pump = sdl.event_pump().map_err(|e| anyhow!(e))?;
+
+        Ok(Self {
+            _sdl: sdl,
+            canvas,
+            texture,
+            event_pump,
+            framebuffer: FrameBuffer::new(),
+            pressed: HashSet::new(),
+            limit_fps,
+        })
+    }
+
+    pub fn run(&mut self, gameboy: &mut Gameboy) -> Result<()> {
+        let mut running = true;
+        let mut last_frame = Instant::now();
+        while running {
+            let events: Vec<_> = self.event_pump.poll_iter().collect();
+            for event in events {
+                match event {
+                    Event::Quit { .. } => running = false,
+                    Event::KeyDown {
+                        keycode: Some(Keycode::Escape),
+                        ..
+                    } => running = false,
+                    Event::KeyDown {
+                        keycode: Some(code),
+                        repeat: false,
+                        ..
+                    } => self.handle_press(gameboy, code),
+                    Event::KeyUp {
+                        keycode: Some(code),
+                        ..
+                    } => self.handle_release(gameboy, code),
+                    _ => {}
+                }
+            }
+
+            self.emulate_frame(gameboy)?;
+            self.present_frame()?;
+
+            if self.limit_fps {
+                let elapsed = last_frame.elapsed();
+                if elapsed < TARGET_FRAME {
+                    std::thread::sleep(TARGET_FRAME - elapsed);
+                }
+                last_frame = Instant::now();
+            }
+        }
+        Ok(())
+    }
+
+    fn handle_press(&mut self, gameboy: &mut Gameboy, code: Keycode) {
+        if let Some(button) = map_key(code) {
+            if self.pressed.insert(button) {
+                gameboy.press_button(button);
+            }
+        }
+    }
+
+    fn handle_release(&mut self, gameboy: &mut Gameboy, code: Keycode) {
+        if let Some(button) = map_key(code) {
+            if self.pressed.remove(&button) {
+                gameboy.release_button(button);
+            }
+        }
+    }
+
+    fn emulate_frame(&mut self, gameboy: &mut Gameboy) -> Result<()> {
+        loop {
+            match gameboy.emulate(&mut self.framebuffer) {
+                StepResult::VBlank => break,
+                StepResult::AudioBufferFull | StepResult::Nothing => {}
+            }
+        }
+        Ok(())
+    }
+
+    fn present_frame(&mut self) -> Result<()> {
+        self.texture
+            .update(None, self.framebuffer.as_bytes(), WIDTH * 4)
+            .context("failed to upload frame")?;
+        self.canvas.clear();
+        self.canvas
+            .copy(&self.texture, None, None)
+            .map_err(|e| anyhow!(e))?;
+        self.canvas.present();
+        Ok(())
+    }
+}
+
+fn map_key(key: Keycode) -> Option<Button> {
+    match key {
+        Keycode::Left => Some(Button::Left),
+        Keycode::Right => Some(Button::Right),
+        Keycode::Up => Some(Button::Up),
+        Keycode::Down => Some(Button::Down),
+        Keycode::Z => Some(Button::A),
+        Keycode::X => Some(Button::B),
+        Keycode::Return => Some(Button::Start),
+        Keycode::RShift | Keycode::LShift | Keycode::Space | Keycode::Backspace => {
+            Some(Button::Select)
+        }
+        _ => None,
+    }
+}
