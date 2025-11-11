@@ -64,6 +64,7 @@ pub struct AiController {
     rng: SmallRng,
     logger: Option<BufWriter<File>>,
     start_counter: u8,
+    start_delay_frames: u32,
 }
 
 impl AiController {
@@ -82,6 +83,7 @@ impl AiController {
             rng: SmallRng::seed_from_u64(seed),
             logger,
             start_counter: 4,
+            start_delay_frames: 300,
         })
     }
 
@@ -91,7 +93,10 @@ impl AiController {
         let observation = capture_observation(gameboy, self.frame_count);
         self.maybe_log_summary(&observation);
 
-        let action = if self.start_counter > 0 {
+        let action = if self.start_delay_frames > 0 {
+            self.start_delay_frames -= 1;
+            AiAction::None
+        } else if self.start_counter > 0 {
             self.start_counter -= 1;
             AiAction::Start
         } else {
