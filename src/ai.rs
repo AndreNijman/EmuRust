@@ -65,6 +65,7 @@ pub struct AiController {
     logger: Option<BufWriter<File>>,
     start_counter: u8,
     start_delay_frames: u32,
+    start_cooldown: u32,
 }
 
 impl AiController {
@@ -84,6 +85,7 @@ impl AiController {
             logger,
             start_counter: 4,
             start_delay_frames: 300,
+            start_cooldown: 0,
         })
     }
 
@@ -97,8 +99,14 @@ impl AiController {
             self.start_delay_frames -= 1;
             AiAction::None
         } else if self.start_counter > 0 {
-            self.start_counter -= 1;
-            AiAction::Start
+            if self.start_cooldown > 0 {
+                self.start_cooldown -= 1;
+                AiAction::None
+            } else {
+                self.start_counter -= 1;
+                self.start_cooldown = 60; // 1 second at 60 FPS
+                AiAction::Start
+            }
         } else {
             self.decide()
         };
