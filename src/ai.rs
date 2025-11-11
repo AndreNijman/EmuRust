@@ -90,6 +90,8 @@ pub struct AiController {
     start_cooldown: u32,
     down_cooldown: u32,
     prev_lines: u8,
+    restart_counter: u8,
+    restart_cooldown: u32,
 }
 
 impl AiController {
@@ -112,6 +114,8 @@ impl AiController {
             start_cooldown: 0,
             down_cooldown: 0,
             prev_lines: 0,
+            restart_counter: 0,
+            restart_cooldown: 0,
         })
     }
 
@@ -133,6 +137,15 @@ impl AiController {
                 self.start_cooldown = 60; // 1 second at 60 FPS
                 AiAction::Start
             }
+        } else if self.restart_counter > 0 {
+            if self.restart_cooldown > 0 {
+                self.restart_cooldown -= 1;
+                AiAction::None
+            } else {
+                self.restart_counter -= 1;
+                self.restart_cooldown = 60;
+                AiAction::Start
+            }
         } else {
             self.decide(&observation)
         };
@@ -140,6 +153,10 @@ impl AiController {
         let reward = self.compute_reward(&observation);
         self.write_dataset_entry(&observation, action, reward)?;
         self.latest = Some(observation);
+        if reward < -20.0 && self.restart_counter == 0 {
+            self.restart_counter = 3;
+            self.restart_cooldown = 0;
+        }
         Ok(())
     }
 
