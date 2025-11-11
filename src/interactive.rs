@@ -11,6 +11,7 @@ use sdl2::pixels::PixelFormatEnum;
 use sdl2::render::{Canvas, Texture};
 use sdl2::video::Window;
 
+use crate::ai::AiController;
 use crate::audio::AudioPlayer;
 use crate::automation::AutomationRecorder;
 use crate::display::{FrameBuffer, HEIGHT, WIDTH};
@@ -74,6 +75,7 @@ impl InteractiveRunner {
         gameboy: &mut Gameboy,
         audio: &mut AudioPlayer,
         mut recorder: Option<&mut AutomationRecorder>,
+        mut ai: Option<&mut AiController>,
     ) -> Result<()> {
         let mut running = true;
         let mut last_frame = Instant::now();
@@ -99,6 +101,10 @@ impl InteractiveRunner {
                 }
             }
 
+            if let Some(controller) = ai.as_deref_mut() {
+                controller.tick(gameboy);
+            }
+
             self.emulate_frame(gameboy, audio, recorder.as_deref_mut())?;
             self.present_frame()?;
 
@@ -109,6 +115,9 @@ impl InteractiveRunner {
                 }
                 last_frame = Instant::now();
             }
+        }
+        if let Some(controller) = ai {
+            controller.stop(gameboy);
         }
         Ok(())
     }

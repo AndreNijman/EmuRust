@@ -1,3 +1,4 @@
+mod ai;
 mod audio;
 mod automation;
 mod display;
@@ -7,11 +8,12 @@ mod rtc;
 use std::fs;
 use std::path::PathBuf;
 
-use anyhow::{Context, Result, anyhow};
+use anyhow::{Context, Result, anyhow, bail};
 use clap::Parser;
 use gameboy_core::Gameboy;
 use gameboy_core::emulator::step_result::StepResult;
 
+use crate::ai::AiController;
 use crate::audio::AudioPlayer;
 use crate::automation::{
     AutomationRecorder, DumpFormat, MemoryRange, WatchFormat, WatchOutput, WatchSpec,
@@ -74,6 +76,10 @@ struct Cli {
     /// Optional file to collect memory watch output (stdout when omitted)
     #[arg(long, requires = "watches")]
     watch_output: Option<PathBuf>,
+
+    /// Enable experimental AI controller (currently placeholder)
+    #[arg(long)]
+    ai: bool,
 }
 
 fn main() -> Result<()> {
@@ -81,11 +87,16 @@ fn main() -> Result<()> {
     let cli = Cli::parse();
     let rom_bytes = fs::read(&cli.rom).with_context(|| "failed to read ROM file")?;
 
+    if cli.ai && !cli.interactive {
+        bail!("--ai currently requires --interactive so the window stays visible");
+    }
+
     let rtc = Box::new(SystemRtc);
     let mut gameboy = Gameboy::from_rom(rom_bytes, rtc).map_err(|err| anyhow!(err))?;
 
     let mut audio = AudioPlayer::new()?;
     let mut recorder = build_recorder(&cli)?;
+    let mut ai = build_ai(&cli)?;
 
     if cli.interactive {
         let title = cli
@@ -94,9 +105,19 @@ fn main() -> Result<()> {
             .and_then(|n| n.to_str())
             .unwrap_or("Game Boy");
         let mut runner = InteractiveRunner::new(title, cli.scale, cli.limit_fps)?;
-        runner.run(&mut gameboy, &mut audio, recorder.as_mut())?;
+        runner.run(&mut gameboy, &mut audio, recorder.as_mut(), ai.as_mut())?;
     } else {
-        run_headless(&mut gameboy, &cli, &mut audio, recorder.as_mut())?;
+        run_headless(
+            &mut gameboy,
+            &cli,
+            &mut audio,
+            recorder.as_mut(),
+            ai.as_mut(),
+        )?;
+    }
+
+    if let Some(controller) = ai.as_mut() {
+        controller.stop(&mut gameboy);
     }
 
     if let Some(range) = &cli.dump_range {
@@ -119,17 +140,29 @@ fn build_recorder(cli: &Cli) -> Result<Option<AutomationRecorder>> {
     Ok(Some(recorder))
 }
 
+fn build_ai(cli: &Cli) -> Result<Option<AiController>> {
+    if cli.ai {
+        Ok(Some(AiController::new()))
+    } else {
+        Ok(None)
+    }
+}
+
 fn run_headless(
     gameboy: &mut Gameboy,
     cli: &Cli,
     audio: &mut AudioPlayer,
     mut recorder: Option<&mut AutomationRecorder>,
+    mut ai: Option<&mut AiController>,
 ) -> Result<()> {
     let mut display = NullDisplay;
     let mut frame_counter = 0u64;
 
     if let Some(cycles) = cli.cycles {
         for _ in 0..cycles {
+            if let Some(controller) = ai.as_deref_mut() {
+                controller.tick(gameboy);
+            }
             match gameboy.emulate(&mut display) {
                 StepResult::AudioBufferFull => audio.push_samples(gameboy.get_audio_buffer()),
                 StepResult::VBlank => {
@@ -146,6 +179,9 @@ fn run_headless(
 
     if cli.frames == 0 {
         loop {
+            if let Some(controller) = ai.as_deref_mut() {
+                controller.tick(gameboy);
+            }
             match gameboy.emulate(&mut display) {
                 StepResult::AudioBufferFull => audio.push_samples(gameboy.get_audio_buffer()),
                 StepResult::VBlank => {
@@ -161,6 +197,9 @@ fn run_headless(
 
     let mut remaining = cli.frames;
     while remaining > 0 {
+        if let Some(controller) = ai.as_deref_mut() {
+            controller.tick(gameboy);
+        }
         match gameboy.emulate(&mut display) {
             StepResult::VBlank => {
                 remaining -= 1;
