@@ -32,6 +32,9 @@ directly, skip the menu:
 cargo run --release -- --rom games/tetris.gb
 ```
 
+> **Frame pacing**: Windows default to ~60 FPS so titles run at their intended speed. Pass
+> `--limit-fps=false` only if you explicitly want uncapped rendering (useful for debugging).
+
 ### Controls (Game Boy built-in core)
 
 - Arrow keys: D-pad

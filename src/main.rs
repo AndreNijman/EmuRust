@@ -34,8 +34,8 @@ struct Cli {
     #[arg(long, default_value_t = 4)]
     scale: u32,
 
-    /// Limit interactive window to ~60 FPS
-    #[arg(long)]
+    /// Limit interactive window to ~60 FPS (pass --limit-fps=false to disable)
+    #[arg(long, default_value_t = true)]
     limit_fps: bool,
 }
 

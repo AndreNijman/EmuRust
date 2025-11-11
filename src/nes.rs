@@ -16,12 +16,8 @@ const HEIGHT: usize = 240;
 const TARGET_FRAME: Duration = Duration::from_micros(16_667);
 
 pub fn run(rom: &Path, scale: u32, limit_fps: bool) -> Result<()> {
-    let cartridge = Cartridge::load_from_file(rom).map_err(|err| {
-        anyhow!(
-            "failed to load NES ROM {}: {err}",
-            rom.display()
-        )
-    })?;
+    let cartridge = Cartridge::load_from_file(rom)
+        .map_err(|err| anyhow!("failed to load NES ROM {}: {err}", rom.display()))?;
     let mut nes = Nes::new(cartridge);
     let title = rom.file_stem().and_then(|s| s.to_str()).unwrap_or("NES");
 
