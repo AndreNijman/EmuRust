@@ -89,6 +89,7 @@ pub struct AiController {
     start_delay_frames: u32,
     start_cooldown: u32,
     down_cooldown: u32,
+    prev_lines: u8,
 }
 
 impl AiController {
@@ -110,6 +111,7 @@ impl AiController {
             start_delay_frames: 300,
             start_cooldown: 0,
             down_cooldown: 0,
+            prev_lines: 0,
         })
     }
 
@@ -135,7 +137,8 @@ impl AiController {
             self.decide(&observation)
         };
         self.apply_action(gameboy, action);
-        self.write_dataset_entry(&observation, action)?;
+        let reward = self.compute_reward(&observation);
+        self.write_dataset_entry(&observation, action, reward)?;
         self.latest = Some(observation);
         Ok(())
     }
@@ -183,6 +186,14 @@ impl AiController {
         }
     }
 
+    fn compute_reward(&mut self, obs: &GameObservation) -> f32 {
+        let line_delta = obs.lines.wrapping_sub(self.prev_lines);
+        self.prev_lines = obs.lines;
+        let cleared_reward = line_delta as f32 * 25.0;
+        let fill_penalty = obs.filled_cells() as f32 * 0.02;
+        cleared_reward - fill_penalty
+    }
+
     fn apply_action(&mut self, gameboy: &mut Gameboy, action: AiAction) {
         let desired = action.button();
         if desired == self.held {
@@ -199,12 +210,15 @@ impl AiController {
 
     fn maybe_log_summary(&mut self, obs: &GameObservation) {
         if obs.frame - self.last_logged >= 60 {
+            let (left, right) = obs.half_counts();
             info!(
-                "AI obs frame {}: level {}, lines {}, cells {}, next {}",
+                "AI obs frame {}: level {}, lines {}, cells {}, L/R {}:{}, next {}",
                 obs.frame,
                 obs.level,
                 obs.lines,
                 obs.filled_cells(),
+                left,
+                right,
                 obs.next_piece
             );
             self.last_logged = obs.frame;
@@ -215,9 +229,10 @@ impl AiController {
         &mut self,
         obs: &GameObservation,
         action: AiAction,
+        reward: f32,
     ) -> anyhow::Result<()> {
         if let Some(writer) = self.logger.as_mut() {
-            let json = serde_json::to_string(&LoggedSample::from(obs, action))?;
+            let json = serde_json::to_string(&LoggedSample::from(obs, action, reward))?;
             writeln!(writer, "{}", json)?;
         }
         Ok(())
@@ -232,11 +247,12 @@ struct LoggedSample {
     next_piece: u8,
     filled_cells: usize,
     action: AiAction,
+    reward: f32,
     board_hex: String,
 }
 
 impl LoggedSample {
-    fn from(obs: &GameObservation, action: AiAction) -> Self {
+    fn from(obs: &GameObservation, action: AiAction, reward: f32) -> Self {
         Self {
             frame: obs.frame,
             level: obs.level,
@@ -244,6 +260,7 @@ impl LoggedSample {
             next_piece: obs.next_piece,
             filled_cells: obs.filled_cells(),
             action,
+            reward,
             board_hex: encode_hex(&obs.board),
         }
     }
