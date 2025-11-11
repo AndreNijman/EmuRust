@@ -34,6 +34,21 @@ impl GameObservation {
     pub fn filled_cells(&self) -> usize {
         self.board.iter().filter(|cell| **cell != 0).count()
     }
+
+    pub fn half_counts(&self) -> (usize, usize) {
+        let mut left = 0usize;
+        let mut right = 0usize;
+        for (idx, cell) in self.board.iter().enumerate() {
+            if *cell != 0 {
+                if (idx % 10) < 5 {
+                    left += 1;
+                } else {
+                    right += 1;
+                }
+            }
+        }
+        (left, right)
+    }
 }
 
 #[derive(Serialize, Clone, Copy)]
@@ -73,6 +88,7 @@ pub struct AiController {
     start_counter: u8,
     start_delay_frames: u32,
     start_cooldown: u32,
+    down_cooldown: u32,
 }
 
 impl AiController {
@@ -93,6 +109,7 @@ impl AiController {
             start_counter: 4,
             start_delay_frames: 300,
             start_cooldown: 0,
+            down_cooldown: 0,
         })
     }
 
@@ -115,7 +132,7 @@ impl AiController {
                 AiAction::Start
             }
         } else {
-            self.decide()
+            self.decide(&observation)
         };
         self.apply_action(gameboy, action);
         self.write_dataset_entry(&observation, action)?;
@@ -137,17 +154,33 @@ impl AiController {
         self.latest.as_ref()
     }
 
-    fn decide(&mut self) -> AiAction {
-        const ACTIONS: [AiAction; 7] = [
-            AiAction::None,
-            AiAction::Left,
-            AiAction::Right,
-            AiAction::Up,
-            AiAction::Down,
-            AiAction::A,
-            AiAction::B,
-        ];
-        *ACTIONS.choose(&mut self.rng).unwrap_or(&AiAction::None)
+    fn decide(&mut self, obs: &GameObservation) -> AiAction {
+        if self.down_cooldown == 0 {
+            self.down_cooldown = 5;
+            return AiAction::Down;
+        } else {
+            self.down_cooldown -= 1;
+        }
+
+        let (left, right) = obs.half_counts();
+        let diff = left as i32 - right as i32;
+        if diff.abs() <= 2 {
+            const ACTIONS: [AiAction; 6] = [
+                AiAction::Left,
+                AiAction::Right,
+                AiAction::Up,
+                AiAction::A,
+                AiAction::B,
+                AiAction::None,
+            ];
+            return *ACTIONS.choose(&mut self.rng).unwrap_or(&AiAction::None);
+        }
+
+        if diff > 0 {
+            AiAction::Right
+        } else {
+            AiAction::Left
+        }
     }
 
     fn apply_action(&mut self, gameboy: &mut Gameboy, action: AiAction) {

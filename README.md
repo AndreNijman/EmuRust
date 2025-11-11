@@ -46,9 +46,10 @@ cargo run --release -- ./tetris.gb --interactive --limit-fps --scale 4
 - `--interactive` opens the SDL2 window and streams frames in real time.
 - `--limit-fps` enables vsync (~60 FPS). Omit it to run as fast as possible.
 - `--scale` resizes the window (`1`, `2`, `4`, `8`, …). Use `--scale 1` for native 160×144 output.
-- `--ai` enables the experimental AI controller. It currently presses random directions to keep the
-  pipeline exercised, captures Game Boy Tetris RAM every frame, logs summaries, and (optionally)
-  writes JSONL datasets when `--ai-log path` is provided. Use `--ai-seed` for reproducible runs.
+- `--ai` enables the experimental AI controller. It now auto-starts the ROM, continuously captures
+  Game Boy Tetris RAM, follows a simple heuristic (drops pieces, nudges toward the lighter half of
+  the board, randomly mixes in rotations/A/B), logs summaries, and (optionally) writes JSONL
+  datasets when `--ai-log path` is provided. Use `--ai-seed` for reproducible runs.
 - Audio is streamed automatically through SDL2, so if your system audio is configured you should
   hear the ROM immediately.
 
