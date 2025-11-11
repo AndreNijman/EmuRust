@@ -46,8 +46,9 @@ cargo run --release -- ./tetris.gb --interactive --limit-fps --scale 4
 - `--interactive` opens the SDL2 window and streams frames in real time.
 - `--limit-fps` enables vsync (~60 FPS). Omit it to run as fast as possible.
 - `--scale` resizes the window (`1`, `2`, `4`, `8`, …). Use `--scale 1` for native 160×144 output.
-- `--ai` enables the experimental AI controller pipeline (currently a stub) so future learning
-  agents can drive input programmatically.
+- `--ai` enables the experimental AI controller pipeline (currently a stub). When active, the emulator
+  begins capturing Game Boy Tetris RAM (playfield, level, lines, next piece) each frame and logging
+  summary stats so future learning agents can act on the state.
 - Audio is streamed automatically through SDL2, so if your system audio is configured you should
   hear the ROM immediately.
 
