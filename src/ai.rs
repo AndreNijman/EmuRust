@@ -6,6 +6,7 @@ use gameboy_core::{Button, Gameboy};
 use log::info;
 use rand::SeedableRng;
 use rand::rngs::SmallRng;
+use rand::seq::SliceRandom;
 use serde::Serialize;
 
 const BOARD_ADDR: u16 = 0xC0A0; // 10x20 playfield in Game Boy Tetris
@@ -41,6 +42,9 @@ pub enum AiAction {
     Left,
     Right,
     Down,
+    Up,
+    A,
+    B,
     Start,
 }
 
@@ -51,6 +55,9 @@ impl AiAction {
             AiAction::Left => Some(Button::Left),
             AiAction::Right => Some(Button::Right),
             AiAction::Down => Some(Button::Down),
+            AiAction::Up => Some(Button::Up),
+            AiAction::A => Some(Button::A),
+            AiAction::B => Some(Button::B),
             AiAction::Start => Some(Button::Start),
         }
     }
@@ -131,13 +138,16 @@ impl AiController {
     }
 
     fn decide(&mut self) -> AiAction {
-        let roll: f32 = rand::Rng::r#gen(&mut self.rng);
-        match roll {
-            r if r < 0.2 => AiAction::Left,
-            r if r < 0.4 => AiAction::Right,
-            r if r < 0.6 => AiAction::Down,
-            _ => AiAction::None,
-        }
+        const ACTIONS: [AiAction; 7] = [
+            AiAction::None,
+            AiAction::Left,
+            AiAction::Right,
+            AiAction::Up,
+            AiAction::Down,
+            AiAction::A,
+            AiAction::B,
+        ];
+        *ACTIONS.choose(&mut self.rng).unwrap_or(&AiAction::None)
     }
 
     fn apply_action(&mut self, gameboy: &mut Gameboy, action: AiAction) {
