@@ -11,6 +11,7 @@ used.
 
 - Accurate emulation pipeline from `gameboy_core` (DMG + most common MBCs, timers, interrupts)
 - SDL2-based interactive window with 4-tone DMG palette, scaling, vsync, and keyboard controls
+- Real-time audio playback streamed through SDL2 (stereo f32 output)
 - Headless CLI options for deterministic frame or cycle counts (useful for automation/tests)
 - Friendly command-line interface (`clap`) and logging (`env_logger`)
 - Simple code layout for future extensions (audio streaming, savestates, web builds, etc.)
@@ -44,6 +45,8 @@ cargo run --release -- ./tetris.gb --interactive --limit-fps --scale 4
 - `--interactive` opens the SDL2 window and streams frames in real time.
 - `--limit-fps` enables vsync (~60 FPS). Omit it to run as fast as possible.
 - `--scale` resizes the window (`1`, `2`, `4`, `8`, …). Use `--scale 1` for native 160×144 output.
+- Audio is streamed automatically through SDL2, so if your system audio is configured you should
+  hear the ROM immediately.
 
 **Controls**
 
@@ -68,6 +71,9 @@ cargo run -- ./tetris.gb --cycles 1_000_000
 # Run forever without a window (Ctrl+C to stop)
 cargo run -- ./tetris.gb --frames 0
 ```
+
+Audio output remains enabled in headless mode, so you'll still hear the ROM unless you mute the
+system output.
 
 ### CLI reference
 

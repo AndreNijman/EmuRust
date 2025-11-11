@@ -1,3 +1,4 @@
+mod audio;
 mod display;
 mod interactive;
 mod rtc;
@@ -10,6 +11,7 @@ use clap::Parser;
 use gameboy_core::Gameboy;
 use gameboy_core::emulator::step_result::StepResult;
 
+use crate::audio::AudioPlayer;
 use crate::display::NullDisplay;
 use crate::interactive::InteractiveRunner;
 use crate::rtc::SystemRtc;
@@ -53,6 +55,8 @@ fn main() -> Result<()> {
     let rtc = Box::new(SystemRtc);
     let mut gameboy = Gameboy::from_rom(rom_bytes, rtc).map_err(|err| anyhow!(err))?;
 
+    let mut audio = AudioPlayer::new()?;
+
     if cli.interactive {
         let title = cli
             .rom
@@ -60,21 +64,21 @@ fn main() -> Result<()> {
             .and_then(|n| n.to_str())
             .unwrap_or("Game Boy");
         let mut runner = InteractiveRunner::new(title, cli.scale, cli.limit_fps)?;
-        runner.run(&mut gameboy)?;
+        runner.run(&mut gameboy, &mut audio)?;
     } else {
-        run_headless(&mut gameboy, &cli)?;
+        run_headless(&mut gameboy, &cli, &mut audio)?;
     }
 
     Ok(())
 }
 
-fn run_headless(gameboy: &mut Gameboy, cli: &Cli) -> Result<()> {
+fn run_headless(gameboy: &mut Gameboy, cli: &Cli, audio: &mut AudioPlayer) -> Result<()> {
     let mut display = NullDisplay;
     if let Some(cycles) = cli.cycles {
         for _ in 0..cycles {
             match gameboy.emulate(&mut display) {
-                StepResult::AudioBufferFull | StepResult::Nothing => {}
-                StepResult::VBlank => {}
+                StepResult::AudioBufferFull => audio.push_samples(gameboy.get_audio_buffer()),
+                StepResult::Nothing | StepResult::VBlank => {}
             }
         }
         return Ok(());
@@ -83,16 +87,19 @@ fn run_headless(gameboy: &mut Gameboy, cli: &Cli) -> Result<()> {
     if cli.frames == 0 {
         loop {
             match gameboy.emulate(&mut display) {
-                StepResult::VBlank | StepResult::AudioBufferFull | StepResult::Nothing => {}
+                StepResult::AudioBufferFull => audio.push_samples(gameboy.get_audio_buffer()),
+                StepResult::VBlank | StepResult::Nothing => {}
             }
         }
     }
 
     let mut remaining = cli.frames;
     while remaining > 0 {
-        if let StepResult::VBlank = gameboy.emulate(&mut display) {
-            remaining -= 1;
-        }
+        match gameboy.emulate(&mut display) {
+            StepResult::VBlank => remaining -= 1,
+            StepResult::AudioBufferFull => audio.push_samples(gameboy.get_audio_buffer()),
+            StepResult::Nothing => {}
+        };
     }
     Ok(())
 }
