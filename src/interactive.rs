@@ -12,7 +12,6 @@ use sdl2::render::{Canvas, Texture};
 use sdl2::video::Window;
 
 use crate::audio::AudioPlayer;
-use crate::automation::AutomationRecorder;
 use crate::display::{FrameBuffer, HEIGHT, WIDTH};
 
 const TARGET_FRAME: Duration = Duration::from_micros(16_667);
@@ -25,7 +24,6 @@ pub struct InteractiveRunner {
     framebuffer: FrameBuffer,
     pressed: HashSet<Button>,
     limit_fps: bool,
-    frame_counter: u64,
 }
 
 impl InteractiveRunner {
@@ -65,16 +63,10 @@ impl InteractiveRunner {
             framebuffer: FrameBuffer::new(),
             pressed: HashSet::new(),
             limit_fps,
-            frame_counter: 0,
         })
     }
 
-    pub fn run(
-        &mut self,
-        gameboy: &mut Gameboy,
-        audio: &mut AudioPlayer,
-        mut recorder: Option<&mut AutomationRecorder>,
-    ) -> Result<()> {
+    pub fn run(&mut self, gameboy: &mut Gameboy, audio: &mut AudioPlayer) -> Result<()> {
         let mut running = true;
         let mut last_frame = Instant::now();
         while running {
@@ -99,7 +91,7 @@ impl InteractiveRunner {
                 }
             }
 
-            self.emulate_frame(gameboy, audio, recorder.as_deref_mut())?;
+            self.emulate_frame(gameboy, audio)?;
             self.present_frame()?;
 
             if self.limit_fps {
@@ -129,21 +121,10 @@ impl InteractiveRunner {
         }
     }
 
-    fn emulate_frame(
-        &mut self,
-        gameboy: &mut Gameboy,
-        audio: &mut AudioPlayer,
-        recorder: Option<&mut AutomationRecorder>,
-    ) -> Result<()> {
+    fn emulate_frame(&mut self, gameboy: &mut Gameboy, audio: &mut AudioPlayer) -> Result<()> {
         loop {
             match gameboy.emulate(&mut self.framebuffer) {
-                StepResult::VBlank => {
-                    if let Some(rec) = recorder {
-                        rec.record(self.frame_counter, gameboy)?;
-                    }
-                    self.frame_counter += 1;
-                    break;
-                }
+                StepResult::VBlank => break,
                 StepResult::AudioBufferFull => audio.push_samples(gameboy.get_audio_buffer()),
                 StepResult::Nothing => {}
             };

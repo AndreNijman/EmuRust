@@ -55,11 +55,3 @@ fn color_index(color: Color) -> usize {
         Color::Black => 3,
     }
 }
-
-pub struct NullDisplay;
-
-impl PixelMapper for NullDisplay {
-    fn map_pixel(&mut self, _pixel: usize, _color: Color) {}
-
-    fn cgb_map_pixel(&mut self, _pixel: usize, _color: CGBColor) {}
-}
