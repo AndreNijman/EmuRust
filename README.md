@@ -96,7 +96,6 @@ All commands run from the repository root.
 
 ## Roadmap / Ideas
 
-- Stream `gameboy_core` audio buffer to SDL audio device
 - Configurable key bindings and controller/gamepad support
 - Savestates & SRAM persistence helpers
 - WebAssembly/WebGPU frontend built on the same core
