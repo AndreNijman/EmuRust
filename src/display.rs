@@ -28,10 +28,6 @@ impl FrameBuffer {
         }
     }
 
-    pub fn pixels(&self) -> &[u32] {
-        &self.pixels
-    }
-
     pub fn as_bytes(&self) -> &[u8] {
         cast_slice(&self.pixels)
     }
