@@ -13,6 +13,8 @@ use sdl2::render::{Canvas, Texture};
 use sdl2::video::Window;
 use super_sabicom::Snes;
 
+use crate::controller::{ControllerManager, VirtualButton};
+
 const TARGET_FRAME: Duration = Duration::from_micros(16_667);
 const DEFAULT_WIDTH: u32 = 512;
 const DEFAULT_HEIGHT: u32 = 448;
@@ -73,6 +75,7 @@ struct SnesFrontend {
     scale: u32,
     argb_buffer: Vec<u32>,
     audio_scratch: Vec<i16>,
+    controller: ControllerManager,
 }
 
 impl SnesFrontend {
@@ -117,6 +120,7 @@ impl SnesFrontend {
         audio.resume();
 
         let event_pump = sdl.event_pump().map_err(|e| anyhow!(e))?;
+        let controller = ControllerManager::new(&sdl)?;
 
         Ok(Self {
             _sdl: sdl,
@@ -129,6 +133,7 @@ impl SnesFrontend {
             scale: scale.max(1),
             argb_buffer: vec![0; (DEFAULT_WIDTH as usize) * (DEFAULT_HEIGHT as usize)],
             audio_scratch: Vec::with_capacity(2048),
+            controller,
         })
     }
 
@@ -137,6 +142,7 @@ impl SnesFrontend {
         let mut running = true;
         while running {
             for event in self.event_pump.poll_iter() {
+                self.controller.handle_event(&event);
                 match event {
                     Event::Quit { .. } => running = false,
                     Event::KeyDown {
@@ -160,7 +166,7 @@ impl SnesFrontend {
                 }
             }
 
-            let input = build_input_data(&self.pressed);
+            let input = build_input_data(&self.pressed, &self.controller);
             snes.set_input(&input);
             snes.exec_frame(true);
 
@@ -240,37 +246,106 @@ impl SnesFrontend {
     }
 }
 
-fn build_input_data(pressed: &HashSet<Keycode>) -> InputData {
+fn build_input_data(pressed: &HashSet<Keycode>, controllers: &ControllerManager) -> InputData {
     let mut controller = Vec::with_capacity(12);
-    controller.push(("B".into(), is_pressed(pressed, &[Keycode::Z])));
-    controller.push(("Y".into(), is_pressed(pressed, &[Keycode::A])));
+    controller.push((
+        "B".into(),
+        button_active(pressed, controllers, &[Keycode::Z], Some(VirtualButton::B)),
+    ));
+    controller.push((
+        "Y".into(),
+        button_active(pressed, controllers, &[Keycode::A], Some(VirtualButton::Y)),
+    ));
     controller.push((
         "Select".into(),
-        is_pressed(
+        button_active(
             pressed,
+            controllers,
             &[
                 Keycode::RShift,
                 Keycode::LShift,
                 Keycode::Space,
                 Keycode::Backspace,
             ],
+            Some(VirtualButton::Select),
         ),
     ));
-    controller.push(("Start".into(), is_pressed(pressed, &[Keycode::Return])));
-    controller.push(("Up".into(), is_pressed(pressed, &[Keycode::Up])));
-    controller.push(("Down".into(), is_pressed(pressed, &[Keycode::Down])));
-    controller.push(("Left".into(), is_pressed(pressed, &[Keycode::Left])));
-    controller.push(("Right".into(), is_pressed(pressed, &[Keycode::Right])));
-    controller.push(("A".into(), is_pressed(pressed, &[Keycode::X])));
-    controller.push(("X".into(), is_pressed(pressed, &[Keycode::S])));
-    controller.push(("L".into(), is_pressed(pressed, &[Keycode::Q])));
-    controller.push(("R".into(), is_pressed(pressed, &[Keycode::W])));
+    controller.push((
+        "Start".into(),
+        button_active(
+            pressed,
+            controllers,
+            &[Keycode::Return],
+            Some(VirtualButton::Start),
+        ),
+    ));
+    controller.push((
+        "Up".into(),
+        button_active(
+            pressed,
+            controllers,
+            &[Keycode::Up],
+            Some(VirtualButton::Up),
+        ),
+    ));
+    controller.push((
+        "Down".into(),
+        button_active(
+            pressed,
+            controllers,
+            &[Keycode::Down],
+            Some(VirtualButton::Down),
+        ),
+    ));
+    controller.push((
+        "Left".into(),
+        button_active(
+            pressed,
+            controllers,
+            &[Keycode::Left],
+            Some(VirtualButton::Left),
+        ),
+    ));
+    controller.push((
+        "Right".into(),
+        button_active(
+            pressed,
+            controllers,
+            &[Keycode::Right],
+            Some(VirtualButton::Right),
+        ),
+    ));
+    controller.push((
+        "A".into(),
+        button_active(pressed, controllers, &[Keycode::X], Some(VirtualButton::A)),
+    ));
+    controller.push((
+        "X".into(),
+        button_active(pressed, controllers, &[Keycode::S], Some(VirtualButton::X)),
+    ));
+    controller.push((
+        "L".into(),
+        button_active(pressed, controllers, &[Keycode::Q], Some(VirtualButton::L)),
+    ));
+    controller.push((
+        "R".into(),
+        button_active(pressed, controllers, &[Keycode::W], Some(VirtualButton::R)),
+    ));
 
     InputData {
         controllers: vec![controller],
     }
 }
 
-fn is_pressed(pressed: &HashSet<Keycode>, keys: &[Keycode]) -> bool {
-    keys.iter().any(|key| pressed.contains(key))
+fn button_active(
+    pressed: &HashSet<Keycode>,
+    controllers: &ControllerManager,
+    keys: &[Keycode],
+    controller_button: Option<VirtualButton>,
+) -> bool {
+    let keyboard = keys.iter().any(|key| pressed.contains(key));
+    let controller = controller_button
+        .map(|vb| controllers.is_pressed(vb))
+        .unwrap_or(false);
+    keyboard || controller
 }

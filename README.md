@@ -35,6 +35,13 @@ cargo run --release -- --rom games/tetris.gb
 > **Frame pacing**: Windows default to ~60 FPS so titles run at their intended speed. Pass
 > `--limit-fps=false` only if you explicitly want uncapped rendering (useful for debugging).
 
+## Controller Support
+
+Any SDL2-compatible gamepad works across every built-in core. The d-pad (or left stick) maps to the
+console d-pads, `A/B/X/Y` map to the respective face buttons, shoulder buttons map to L/R, `Start`
+maps to START, and `Back/Select` maps to SELECT. Nintendo DS titles still require a mouse for the
+touchscreen, but all handheld/console buttons can be driven from the controller.
+
 ### Controls (Game Boy built-in core)
 
 - Arrow keys: D-pad

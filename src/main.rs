@@ -1,4 +1,5 @@
 mod audio;
+mod controller;
 mod display;
 mod interactive;
 mod launcher;

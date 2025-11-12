@@ -11,6 +11,8 @@ use sdl2::pixels::PixelFormatEnum;
 use sdl2::render::{Canvas, Texture};
 use sdl2::video::Window;
 
+use crate::controller::{ControllerManager, VirtualButton};
+
 const WIDTH: usize = 256;
 const HEIGHT: usize = 240;
 const TARGET_FRAME: Duration = Duration::from_micros(16_667);
@@ -33,6 +35,7 @@ struct NesFrontend {
     pressed: HashSet<Keycode>,
     limit_fps: bool,
     argb_buffer: Vec<u32>,
+    controller: ControllerManager,
 }
 
 impl NesFrontend {
@@ -62,6 +65,7 @@ impl NesFrontend {
             .create_texture_streaming(PixelFormatEnum::ARGB8888, WIDTH as u32, HEIGHT as u32)
             .map_err(|e| anyhow!(e))?;
         let event_pump = sdl.event_pump().map_err(|e| anyhow!(e))?;
+        let controller = ControllerManager::new(&sdl)?;
 
         Ok(Self {
             _sdl: sdl,
@@ -71,6 +75,7 @@ impl NesFrontend {
             pressed: HashSet::new(),
             limit_fps,
             argb_buffer: vec![0; NES_SCREEN_DIMENSIONS],
+            controller,
         })
     }
 
@@ -79,6 +84,7 @@ impl NesFrontend {
         let mut last_frame = Instant::now();
         while running {
             for event in self.event_pump.poll_iter() {
+                self.controller.handle_event(&event);
                 match event {
                     Event::Quit { .. } => running = false,
                     Event::KeyDown {
@@ -102,7 +108,7 @@ impl NesFrontend {
                 }
             }
 
-            nes.update_controller_one(Some(controller_state(&self.pressed)));
+            nes.update_controller_one(Some(controller_state(&self.pressed, &self.controller)));
             let frame = nes.frame();
             self.present_frame(frame)?;
 
@@ -133,7 +139,7 @@ impl NesFrontend {
     }
 }
 
-fn controller_state(pressed: &HashSet<Keycode>) -> u8 {
+fn controller_state(pressed: &HashSet<Keycode>, controllers: &ControllerManager) -> u8 {
     let mut state = 0u8;
     if pressed.contains(&Keycode::X) {
         state |= 0b0000_0001;
@@ -161,6 +167,31 @@ fn controller_state(pressed: &HashSet<Keycode>) -> u8 {
         state |= 0b0100_0000;
     }
     if pressed.contains(&Keycode::Right) {
+        state |= 0b1000_0000;
+    }
+
+    if controllers.is_pressed(VirtualButton::A) {
+        state |= 0b0000_0001;
+    }
+    if controllers.is_pressed(VirtualButton::B) {
+        state |= 0b0000_0010;
+    }
+    if controllers.is_pressed(VirtualButton::Select) {
+        state |= 0b0000_0100;
+    }
+    if controllers.is_pressed(VirtualButton::Start) {
+        state |= 0b0000_1000;
+    }
+    if controllers.is_pressed(VirtualButton::Up) {
+        state |= 0b0001_0000;
+    }
+    if controllers.is_pressed(VirtualButton::Down) {
+        state |= 0b0010_0000;
+    }
+    if controllers.is_pressed(VirtualButton::Left) {
+        state |= 0b0100_0000;
+    }
+    if controllers.is_pressed(VirtualButton::Right) {
         state |= 0b1000_0000;
     }
     state

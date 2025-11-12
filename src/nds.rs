@@ -12,6 +12,8 @@ use sdl2::pixels::PixelFormatEnum;
 use sdl2::render::{Canvas, Texture};
 use sdl2::video::Window;
 
+use crate::controller::{ControllerManager, VirtualButton};
+
 const TARGET_FRAME: Duration = Duration::from_micros(16_667);
 const SCREEN_WIDTH: u32 = desmume_rs::SCREEN_WIDTH as u32;
 const SCREEN_HEIGHT: u32 = desmume_rs::SCREEN_HEIGHT as u32;
@@ -44,6 +46,7 @@ struct NdsFrontend {
     touch_active: bool,
     pixel_buffer: Vec<u8>,
     argb_buffer: Vec<u32>,
+    controller: ControllerManager,
 }
 
 impl NdsFrontend {
@@ -74,6 +77,7 @@ impl NdsFrontend {
             .map_err(|e| anyhow!(e))?;
 
         let event_pump = sdl.event_pump().map_err(|e| anyhow!(e))?;
+        let controller = ControllerManager::new(&sdl)?;
 
         Ok(Self {
             _sdl: sdl,
@@ -86,6 +90,7 @@ impl NdsFrontend {
             touch_active: false,
             pixel_buffer: vec![0; (SCREEN_WIDTH as usize) * (SCREEN_HEIGHT_BOTH as usize) * 4],
             argb_buffer: vec![0; (SCREEN_WIDTH as usize) * (SCREEN_HEIGHT_BOTH as usize)],
+            controller,
         })
     }
 
@@ -94,6 +99,7 @@ impl NdsFrontend {
         let mut last_frame = Instant::now();
         while running {
             while let Some(event) = self.event_pump.poll_event() {
+                self.controller.handle_event(&event);
                 if !self.handle_event(nds, event) {
                     running = false;
                     break;
@@ -195,6 +201,42 @@ impl NdsFrontend {
             if let Some(key) = map_keycode(*code) {
                 mask |= keymask(key);
             }
+        }
+        if self.controller.is_pressed(VirtualButton::A) {
+            mask |= keymask(Key::A);
+        }
+        if self.controller.is_pressed(VirtualButton::B) {
+            mask |= keymask(Key::B);
+        }
+        if self.controller.is_pressed(VirtualButton::X) {
+            mask |= keymask(Key::X);
+        }
+        if self.controller.is_pressed(VirtualButton::Y) {
+            mask |= keymask(Key::Y);
+        }
+        if self.controller.is_pressed(VirtualButton::L) {
+            mask |= keymask(Key::L);
+        }
+        if self.controller.is_pressed(VirtualButton::R) {
+            mask |= keymask(Key::R);
+        }
+        if self.controller.is_pressed(VirtualButton::Start) {
+            mask |= keymask(Key::Start);
+        }
+        if self.controller.is_pressed(VirtualButton::Select) {
+            mask |= keymask(Key::Select);
+        }
+        if self.controller.is_pressed(VirtualButton::Up) {
+            mask |= keymask(Key::Up);
+        }
+        if self.controller.is_pressed(VirtualButton::Down) {
+            mask |= keymask(Key::Down);
+        }
+        if self.controller.is_pressed(VirtualButton::Left) {
+            mask |= keymask(Key::Left);
+        }
+        if self.controller.is_pressed(VirtualButton::Right) {
+            mask |= keymask(Key::Right);
         }
         nds.input_mut().keypad_update(mask);
     }

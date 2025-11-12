@@ -12,9 +12,20 @@ use sdl2::render::{Canvas, Texture};
 use sdl2::video::Window;
 
 use crate::audio::AudioPlayer;
+use crate::controller::{ControllerManager, VirtualButton};
 use crate::display::{FrameBuffer, HEIGHT, WIDTH};
 
 const TARGET_FRAME: Duration = Duration::from_micros(16_667);
+const ALL_BUTTONS: [Button; 8] = [
+    Button::Left,
+    Button::Right,
+    Button::Up,
+    Button::Down,
+    Button::A,
+    Button::B,
+    Button::Start,
+    Button::Select,
+];
 
 pub struct InteractiveRunner {
     _sdl: sdl2::Sdl,
@@ -22,7 +33,9 @@ pub struct InteractiveRunner {
     texture: Texture,
     event_pump: sdl2::EventPump,
     framebuffer: FrameBuffer,
-    pressed: HashSet<Button>,
+    keyboard_buttons: HashSet<Button>,
+    active_buttons: HashSet<Button>,
+    controller: ControllerManager,
     limit_fps: bool,
 }
 
@@ -54,6 +67,7 @@ impl InteractiveRunner {
             .map_err(|e| anyhow!(e))?;
 
         let event_pump = sdl.event_pump().map_err(|e| anyhow!(e))?;
+        let controller = ControllerManager::new(&sdl)?;
 
         Ok(Self {
             _sdl: sdl,
@@ -61,7 +75,9 @@ impl InteractiveRunner {
             texture,
             event_pump,
             framebuffer: FrameBuffer::new(),
-            pressed: HashSet::new(),
+            keyboard_buttons: HashSet::new(),
+            active_buttons: HashSet::new(),
+            controller,
             limit_fps,
         })
     }
@@ -72,6 +88,7 @@ impl InteractiveRunner {
         while running {
             let events: Vec<_> = self.event_pump.poll_iter().collect();
             for event in events {
+                self.controller.handle_event(&event);
                 match event {
                     Event::Quit { .. } => running = false,
                     Event::KeyDown {
@@ -82,15 +99,16 @@ impl InteractiveRunner {
                         keycode: Some(code),
                         repeat: false,
                         ..
-                    } => self.handle_press(gameboy, code),
+                    } => self.handle_press(code),
                     Event::KeyUp {
                         keycode: Some(code),
                         ..
-                    } => self.handle_release(gameboy, code),
+                    } => self.handle_release(code),
                     _ => {}
                 }
             }
 
+            self.sync_buttons(gameboy);
             self.emulate_frame(gameboy, audio)?;
             self.present_frame()?;
 
@@ -105,18 +123,58 @@ impl InteractiveRunner {
         Ok(())
     }
 
-    fn handle_press(&mut self, gameboy: &mut Gameboy, code: Keycode) {
+    fn handle_press(&mut self, code: Keycode) {
         if let Some(button) = map_key(code) {
-            if self.pressed.insert(button) {
-                gameboy.press_button(button);
-            }
+            self.keyboard_buttons.insert(button);
         }
     }
 
-    fn handle_release(&mut self, gameboy: &mut Gameboy, code: Keycode) {
+    fn handle_release(&mut self, code: Keycode) {
         if let Some(button) = map_key(code) {
-            if self.pressed.remove(&button) {
-                gameboy.release_button(button);
+            self.keyboard_buttons.remove(&button);
+        }
+    }
+
+    fn sync_buttons(&mut self, gameboy: &mut Gameboy) {
+        let mut desired = self.keyboard_buttons.clone();
+        if self.controller.is_pressed(VirtualButton::Left) {
+            desired.insert(Button::Left);
+        }
+        if self.controller.is_pressed(VirtualButton::Right) {
+            desired.insert(Button::Right);
+        }
+        if self.controller.is_pressed(VirtualButton::Up) {
+            desired.insert(Button::Up);
+        }
+        if self.controller.is_pressed(VirtualButton::Down) {
+            desired.insert(Button::Down);
+        }
+        if self.controller.is_pressed(VirtualButton::A) {
+            desired.insert(Button::A);
+        }
+        if self.controller.is_pressed(VirtualButton::B) {
+            desired.insert(Button::B);
+        }
+        if self.controller.is_pressed(VirtualButton::Start) {
+            desired.insert(Button::Start);
+        }
+        if self.controller.is_pressed(VirtualButton::Select) {
+            desired.insert(Button::Select);
+        }
+
+        for button in ALL_BUTTONS {
+            let should_press = desired.contains(&button);
+            let is_active = self.active_buttons.contains(&button);
+            match (should_press, is_active) {
+                (true, false) => {
+                    gameboy.press_button(button);
+                    self.active_buttons.insert(button);
+                }
+                (false, true) => {
+                    gameboy.release_button(button);
+                    self.active_buttons.remove(&button);
+                }
+                _ => {}
             }
         }
     }
