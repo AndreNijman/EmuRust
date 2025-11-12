@@ -234,6 +234,19 @@ impl NdsFrontend {
         if x < 0 || y < 0 {
             return None;
         }
+
+        // SDL scales mouse coords into logical space when a logical size is set.
+        if x < SCREEN_WIDTH as i32 && y < SCREEN_HEIGHT_BOTH as i32 {
+            if y < SCREEN_HEIGHT as i32 {
+                return None;
+            }
+            return Some((x as u16, (y - SCREEN_HEIGHT as i32) as u16));
+        }
+
+        self.touch_from_physical(x, y)
+    }
+
+    fn touch_from_physical(&self, x: i32, y: i32) -> Option<(u16, u16)> {
         let (win_w, win_h) = self.window_size;
         if win_w == 0 || win_h == 0 {
             return None;
