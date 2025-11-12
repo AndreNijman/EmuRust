@@ -63,6 +63,18 @@ Leave the `DOLPHIN_BIN` export in your shell profile (or launch the game via `DO
 so the launcher knows which Dolphin binary to spawn. Any other platform can do the same as long as
 the executable is either on `PATH` or the absolute path is assigned to `DOLPHIN_BIN`.
 
+### Core Matrix
+
+| System   | Core delivery                                                                                    |
+|----------|--------------------------------------------------------------------------------------------------|
+| Game Boy | Built-in Rust core (`gameboy_core` patched in-tree)                                              |
+| NES      | Built-in Rust core (`gc_nes_core`)                                                               |
+| SNES     | Built-in Rust core (`super-sabicom` via `meru-interface`)                                        |
+| Nintendo DS | Built-in Rust core (`desmume-rs`)                                                             |
+| GameCube | **External** Dolphin binary (auto-detected via `DOLPHIN_BIN` or `PATH`); stub visualization runs only when Dolphin is missing |
+
+Only the first four systems compile into the launcher. GameCube requires the external Dolphin install described above in order to play games; without it you’ll just see the metadata overlay and placeholder graphics.
+
 ### Controls (Game Boy built-in core)
 
 - Arrow keys: D-pad
