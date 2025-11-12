@@ -1,12 +1,14 @@
 use std::collections::HashSet;
 use std::f32::consts::TAU;
-use std::fs;
+use std::fs::{self, File};
+use std::io::Read;
 use std::path::Path;
 use std::time::{Duration, Instant};
 
 use anyhow::{Context, Result};
 use bitflags::bitflags;
 use font8x8::legacy::BASIC_LEGACY;
+use rvz::Rvz;
 use sdl2::audio::{AudioQueue, AudioSpecDesired};
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
@@ -24,6 +26,33 @@ const AUDIO_CHANNELS: u16 = 2;
 const AUDIO_BUFFER_SAMPLES: u16 = 1024;
 const MAX_AUDIO_LATENCY_BYTES: u32 =
     (AUDIO_SAMPLE_RATE as u32) * (AUDIO_CHANNELS as u32) * std::mem::size_of::<i16>() as u32;
+
+fn load_gamecube_image(path: &Path) -> Result<Vec<u8>> {
+    match path
+        .extension()
+        .and_then(|s| s.to_str())
+        .map(|s| s.to_ascii_lowercase())
+        .as_deref()
+    {
+        Some("rvz") => load_rvz_image(path),
+        _ => fs::read(path)
+            .with_context(|| format!("failed to read GameCube image {}", path.display())),
+    }
+}
+
+fn load_rvz_image(path: &Path) -> Result<Vec<u8>> {
+    let file =
+        File::open(path).with_context(|| format!("failed to open RVZ image {}", path.display()))?;
+    let mut rvz = Rvz::new(file).map_err(|err| anyhow::anyhow!(err))?;
+    let iso_size = rvz.metadata.header.iso_file_size;
+    if iso_size > (usize::MAX as u64) {
+        return Err(anyhow::anyhow!("RVZ image too large to load into memory"));
+    }
+    let mut buffer = Vec::with_capacity(iso_size as usize);
+    rvz.read_to_end(&mut buffer)
+        .with_context(|| format!("failed to decompress {}", path.display()))?;
+    Ok(buffer)
+}
 
 pub fn run(rom_path: &Path, scale: u32, limit_fps: bool) -> Result<()> {
     let title = rom_path
@@ -485,8 +514,7 @@ struct GamecubeCore {
 
 impl GamecubeCore {
     fn from_disc(path: &Path) -> Result<Self> {
-        let disc_bytes = fs::read(path)
-            .with_context(|| format!("failed to read GameCube image {}", path.display()))?;
+        let disc_bytes = load_gamecube_image(path)?;
         let metadata = GamecubeMetadata::parse(&disc_bytes)?;
         let width = DEFAULT_WIDTH;
         let height = DEFAULT_HEIGHT;

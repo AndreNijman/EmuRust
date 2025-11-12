@@ -15,7 +15,7 @@ cargo build --release
 ```
 
 1. Place your ROMs under `games/` (a sample `tetris.gb` is already there).
-2. Just drop your ROMs (`.gb`, `.gbc`, `.nes`, `.sfc`, `.smc`, `.snes`, `.nds`, `.iso`, `.gcm`, `.gcz`, `.gcn`) into `games/`.
+2. Just drop your ROMs (`.gb`, `.gbc`, `.nes`, `.sfc`, `.smc`, `.snes`, `.nds`, `.iso`, `.gcm`, `.gcz`, `.gcn`, `.rvz`) into `games/`.
 
 ## Usage
 
@@ -44,7 +44,8 @@ touchscreen, but all handheld/console buttons can be driven from the controller.
 
 GameCube titles additionally parse the disc header on load—the launcher prints the game ID, maker,
 disc, and streaming flags to the console and an overlay in the top-left corner of the window mirrors
-that metadata so you can quickly confirm which image you booted.
+that metadata so you can quickly confirm which image you booted. Both raw ISOs and Dolphin-style
+`.rvz` images are supported—the latter are transparently decompressed in-memory at launch.
 
 ### Controls (Game Boy built-in core)
 
