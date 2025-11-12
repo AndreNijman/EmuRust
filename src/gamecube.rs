@@ -41,8 +41,11 @@ fn try_launch_dolphin(rom_path: &Path) -> Result<bool> {
         binary.display(),
         rom_path.display()
     );
-    let status = Command::new(&binary)
-        .arg("-b")
+    let mut command = Command::new(&binary);
+    if dolphin_supports_batch(&binary) {
+        command.arg("-b");
+    }
+    let status = command
         .arg("-e")
         .arg(rom_path)
         .status()
@@ -85,6 +88,14 @@ fn dolphin_candidate_bins() -> &'static [&'static str] {
         "Dolphin",
         "Dolphin.exe",
     ]
+}
+
+fn dolphin_supports_batch(binary: &Path) -> bool {
+    binary
+        .file_name()
+        .and_then(|s| s.to_str())
+        .map(|name| !name.to_ascii_lowercase().contains("nogui"))
+        .unwrap_or(true)
 }
 
 fn dolphin_candidate_paths() -> Vec<PathBuf> {
