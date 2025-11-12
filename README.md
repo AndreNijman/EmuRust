@@ -8,6 +8,7 @@ to pick a title—no external emulators required.
 
 - Rust 1.76+
 - SDL2 development libraries (`libsdl2-dev`, `SDL2-devel`, or `brew install sdl2`)
+- Dolphin emulator binary (optional, for full GameCube emulation—set `DOLPHIN_BIN` or place Dolphin on your `PATH`)
 ## Setup
 
 ```bash
@@ -45,7 +46,11 @@ touchscreen, but all handheld/console buttons can be driven from the controller.
 GameCube titles additionally parse the disc header on load—the launcher prints the game ID, maker,
 disc, and streaming flags to the console and an overlay in the top-left corner of the window mirrors
 that metadata so you can quickly confirm which image you booted. Both raw ISOs and Dolphin-style
-`.rvz` images are supported—the latter are transparently decompressed in-memory at launch.
+`.rvz` images are supported—the latter are transparently decompressed in-memory at launch. If a
+Dolphin binary is available (either via the `DOLPHIN_BIN` environment variable or on `PATH` under
+names such as `dolphin-emu`), the launcher automatically hands the game off to Dolphin for full
+emulation; otherwise it falls back to the built-in visualization stub so you still get metadata and
+input plumbing even without the external core installed.
 
 ### Controls (Game Boy built-in core)
 
