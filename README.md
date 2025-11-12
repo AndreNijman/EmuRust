@@ -52,6 +52,17 @@ names such as `dolphin-emu`), the launcher automatically hands the game off to D
 emulation; otherwise it falls back to the built-in visualization stub so you still get metadata and
 input plumbing even without the external core installed.
 
+### Installing Dolphin on Arch Linux
+
+```bash
+sudo pacman -S dolphin-emu
+export DOLPHIN_BIN="$(command -v dolphin-emu-nogui || command -v dolphin-emu)"
+```
+
+Leave the `DOLPHIN_BIN` export in your shell profile (or launch the game via `DOLPHIN_BIN=... cargo run --release`)
+so the launcher knows which Dolphin binary to spawn. Any other platform can do the same as long as
+the executable is either on `PATH` or the absolute path is assigned to `DOLPHIN_BIN`.
+
 ### Controls (Game Boy built-in core)
 
 - Arrow keys: D-pad
