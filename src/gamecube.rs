@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::f32::consts::TAU;
 use std::fs;
 use std::path::Path;
@@ -11,6 +12,8 @@ use sdl2::keyboard::Keycode;
 use sdl2::pixels::PixelFormatEnum;
 use sdl2::render::{Canvas, Texture};
 use sdl2::video::Window;
+
+use crate::controller::{ControllerManager, VirtualButton};
 
 const DEFAULT_WIDTH: u32 = 640;
 const DEFAULT_HEIGHT: u32 = 480;
@@ -40,6 +43,8 @@ struct GamecubeFrontend {
     limit_fps: bool,
     scale: u32,
     argb_buffer: Vec<u32>,
+    pressed: HashSet<Keycode>,
+    controller: ControllerManager,
 }
 
 impl GamecubeFrontend {
@@ -82,6 +87,7 @@ impl GamecubeFrontend {
         audio.resume();
 
         let event_pump = sdl.event_pump().map_err(|e| anyhow::anyhow!(e))?;
+        let controller = ControllerManager::new(&sdl)?;
         Ok(Self {
             _sdl: sdl,
             canvas,
@@ -91,26 +97,42 @@ impl GamecubeFrontend {
             limit_fps,
             scale,
             argb_buffer: vec![0; (DEFAULT_WIDTH as usize) * (DEFAULT_HEIGHT as usize)],
+            pressed: HashSet::new(),
+            controller,
         })
     }
 
     fn run(&mut self, core: &mut GamecubeCore) -> Result<()> {
         let mut running = true;
         let mut last_frame = Instant::now();
-        let input = GamecubeInput::default();
 
         while running {
             for event in self.event_pump.poll_iter() {
+                self.controller.handle_event(&event);
                 match event {
                     Event::Quit { .. } => running = false,
                     Event::KeyDown {
                         keycode: Some(Keycode::Escape),
                         ..
                     } => running = false,
+                    Event::KeyDown {
+                        keycode: Some(code),
+                        repeat: false,
+                        ..
+                    } => {
+                        self.pressed.insert(code);
+                    }
+                    Event::KeyUp {
+                        keycode: Some(code),
+                        ..
+                    } => {
+                        self.pressed.remove(&code);
+                    }
                     _ => {}
                 }
             }
 
+            let input = self.build_input();
             core.step(&input);
             let (width, height) = core.dimensions();
             self.present_frame(core.frame(), width, height)?;
@@ -182,6 +204,137 @@ impl GamecubeFrontend {
         self.audio
             .queue_audio(samples)
             .map_err(|e| anyhow::anyhow!(e))
+    }
+
+    fn build_input(&self) -> GamecubeInput {
+        let analog = self.controller.analog_state().unwrap_or_default();
+        let mut buttons = PadButton::empty();
+
+        let mut left = AnalogStick {
+            x: Self::apply_deadzone(analog.left_x),
+            y: Self::apply_deadzone(analog.left_y),
+        };
+        let mut right = AnalogStick {
+            x: Self::apply_deadzone(analog.right_x),
+            y: Self::apply_deadzone(analog.right_y),
+        };
+        let mut trigger_l = analog.left_trigger;
+        let mut trigger_r = analog.right_trigger;
+
+        let controller_button_map = [
+            (VirtualButton::A, PadButton::A),
+            (VirtualButton::B, PadButton::B),
+            (VirtualButton::X, PadButton::X),
+            (VirtualButton::Y, PadButton::Y),
+            (VirtualButton::L, PadButton::L),
+            (VirtualButton::R, PadButton::R),
+            (VirtualButton::Start, PadButton::START),
+            (VirtualButton::Select, PadButton::Z),
+        ];
+        for (virtual_button, pad_button) in controller_button_map {
+            if self.controller.is_pressed(virtual_button) {
+                buttons |= pad_button;
+            }
+        }
+
+        let keyboard_button_map = [
+            (Keycode::X, PadButton::A),
+            (Keycode::Z, PadButton::B),
+            (Keycode::S, PadButton::X),
+            (Keycode::A, PadButton::Y),
+            (Keycode::Q, PadButton::L),
+            (Keycode::W, PadButton::R),
+            (Keycode::E, PadButton::Z),
+        ];
+        for (key, pad_button) in keyboard_button_map {
+            if self.key_down(key) {
+                buttons |= pad_button;
+            }
+        }
+        if self.any_keys(&[Keycode::Return, Keycode::KpEnter]) {
+            buttons |= PadButton::START;
+        }
+        if self.any_keys(&[Keycode::LShift, Keycode::RShift]) {
+            buttons |= PadButton::Z;
+        }
+
+        let dpad_left =
+            self.key_down(Keycode::Left) || self.controller.is_pressed(VirtualButton::Left);
+        let dpad_right =
+            self.key_down(Keycode::Right) || self.controller.is_pressed(VirtualButton::Right);
+        let dpad_up = self.key_down(Keycode::Up) || self.controller.is_pressed(VirtualButton::Up);
+        let dpad_down =
+            self.key_down(Keycode::Down) || self.controller.is_pressed(VirtualButton::Down);
+
+        if dpad_left {
+            buttons |= PadButton::DPAD_LEFT;
+        }
+        if dpad_right {
+            buttons |= PadButton::DPAD_RIGHT;
+        }
+        if dpad_up {
+            buttons |= PadButton::DPAD_UP;
+        }
+        if dpad_down {
+            buttons |= PadButton::DPAD_DOWN;
+        }
+
+        left.x = Self::axis_override(left.x, dpad_left, dpad_right);
+        left.y = Self::axis_override(left.y, dpad_up, dpad_down);
+
+        let c_left = self.key_down(Keycode::J);
+        let c_right = self.key_down(Keycode::L);
+        let c_up = self.key_down(Keycode::I);
+        let c_down = self.key_down(Keycode::K);
+        right.x = Self::axis_override(right.x, c_left, c_right);
+        right.y = Self::axis_override(right.y, c_up, c_down);
+
+        if self.key_down(Keycode::U) {
+            trigger_l = 1.0;
+        }
+        if self.key_down(Keycode::O) {
+            trigger_r = 1.0;
+        }
+
+        if buttons.contains(PadButton::L) {
+            trigger_l = trigger_l.max(1.0);
+        }
+        if buttons.contains(PadButton::R) {
+            trigger_r = trigger_r.max(1.0);
+        }
+
+        GamecubeInput {
+            buttons,
+            left_stick: left,
+            right_stick: right,
+            trigger_l: trigger_l.clamp(0.0, 1.0),
+            trigger_r: trigger_r.clamp(0.0, 1.0),
+        }
+    }
+
+    fn key_down(&self, key: Keycode) -> bool {
+        self.pressed.contains(&key)
+    }
+
+    fn any_keys(&self, keys: &[Keycode]) -> bool {
+        keys.iter().copied().any(|key| self.key_down(key))
+    }
+
+    fn axis_override(base: f32, negative: bool, positive: bool) -> f32 {
+        match (negative, positive) {
+            (true, false) => -1.0,
+            (false, true) => 1.0,
+            (true, true) => 0.0,
+            (false, false) => base,
+        }
+    }
+
+    fn apply_deadzone(value: f32) -> f32 {
+        if value.abs() < 0.12 {
+            0.0
+        } else {
+            value.clamp(-1.0, 1.0)
+        }
     }
 }
 

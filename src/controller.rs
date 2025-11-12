@@ -23,6 +23,16 @@ pub enum VirtualButton {
     Select,
 }
 
+#[derive(Debug, Clone, Copy, Default)]
+pub struct ControllerAnalogState {
+    pub left_x: f32,
+    pub left_y: f32,
+    pub right_x: f32,
+    pub right_y: f32,
+    pub left_trigger: f32,
+    pub right_trigger: f32,
+}
+
 pub struct ControllerManager {
     subsystem: GameControllerSubsystem,
     controllers: HashMap<u32, ControllerDevice>,
@@ -35,6 +45,10 @@ struct ControllerDevice {
     axis_buttons: HashSet<VirtualButton>,
     left_x: i16,
     left_y: i16,
+    right_x: i16,
+    right_y: i16,
+    left_trigger: i16,
+    right_trigger: i16,
 }
 
 impl ControllerManager {
@@ -84,6 +98,20 @@ impl ControllerManager {
             > 0
     }
 
+    pub fn analog_state(&self) -> Option<ControllerAnalogState> {
+        self.controllers
+            .values()
+            .next()
+            .map(|device| ControllerAnalogState {
+                left_x: normalize_axis(device.left_x),
+                left_y: normalize_axis(device.left_y),
+                right_x: normalize_axis(device.right_x),
+                right_y: normalize_axis(device.right_y),
+                left_trigger: normalize_trigger(device.left_trigger),
+                right_trigger: normalize_trigger(device.right_trigger),
+            })
+    }
+
     fn scan_existing(&mut self) -> Result<()> {
         let num = self.subsystem.num_joysticks().map_err(|err| anyhow!(err))? as u32;
         for idx in 0..num {
@@ -109,6 +137,10 @@ impl ControllerManager {
                 axis_buttons: HashSet::new(),
                 left_x: 0,
                 left_y: 0,
+                right_x: 0,
+                right_y: 0,
+                left_trigger: 0,
+                right_trigger: 0,
             },
         );
         Ok(())
@@ -169,7 +201,22 @@ impl ControllerManager {
             match axis {
                 Axis::LeftX => device.left_x = value,
                 Axis::LeftY => device.left_y = value,
-                _ => return,
+                Axis::RightX => {
+                    device.right_x = value;
+                    return;
+                }
+                Axis::RightY => {
+                    device.right_y = value;
+                    return;
+                }
+                Axis::TriggerLeft => {
+                    device.left_trigger = value;
+                    return;
+                }
+                Axis::TriggerRight => {
+                    device.right_trigger = value;
+                    return;
+                }
             }
             let target = axis_to_buttons(device.left_x, device.left_y);
             let old = device.axis_buttons.clone();
@@ -198,6 +245,23 @@ fn axis_to_buttons(x: i16, y: i16) -> HashSet<VirtualButton> {
         set.insert(VirtualButton::Down);
     }
     set
+}
+
+fn normalize_axis(value: i16) -> f32 {
+    let normalized = (value as f32) / (i16::MAX as f32);
+    if normalized.abs() < 0.05 {
+        0.0
+    } else {
+        normalized.clamp(-1.0, 1.0)
+    }
+}
+
+fn normalize_trigger(value: i16) -> f32 {
+    if value <= 0 {
+        0.0
+    } else {
+        (value as f32 / i16::MAX as f32).clamp(0.0, 1.0)
+    }
 }
 
 fn map_button(button: SdlButton) -> Option<VirtualButton> {
