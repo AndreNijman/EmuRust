@@ -43,6 +43,7 @@ struct NdsFrontend {
     window_size: (u32, u32),
     touch_active: bool,
     pixel_buffer: Vec<u8>,
+    argb_buffer: Vec<u32>,
 }
 
 impl NdsFrontend {
@@ -84,6 +85,7 @@ impl NdsFrontend {
             window_size: (scaled_w.max(1), scaled_h.max(1)),
             touch_active: false,
             pixel_buffer: vec![0; (SCREEN_WIDTH as usize) * (SCREEN_HEIGHT_BOTH as usize) * 4],
+            argb_buffer: vec![0; (SCREEN_WIDTH as usize) * (SCREEN_HEIGHT_BOTH as usize)],
         })
     }
 
@@ -202,8 +204,23 @@ impl NdsFrontend {
             nds.display_buffer_as_rgbx_into(&mut self.pixel_buffer);
         }
 
+        for (dst, chunk) in self
+            .argb_buffer
+            .iter_mut()
+            .zip(self.pixel_buffer.chunks_exact(4))
+        {
+            let r = chunk[2] as u32;
+            let g = chunk[1] as u32;
+            let b = chunk[0] as u32;
+            *dst = (0xFF << 24) | (b << 16) | (g << 8) | r;
+        }
+
         self.texture
-            .update(None, &self.pixel_buffer, (SCREEN_WIDTH as usize) * 4)
+            .update(
+                None,
+                bytemuck::cast_slice(&self.argb_buffer),
+                (SCREEN_WIDTH as usize) * 4,
+            )
             .context("failed to upload NDS frame")?;
         self.canvas.clear();
         self.canvas
