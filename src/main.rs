@@ -2,6 +2,7 @@ mod audio;
 mod display;
 mod interactive;
 mod launcher;
+mod nds;
 mod nes;
 mod rtc;
 mod snes;
@@ -54,6 +55,7 @@ fn main() -> Result<()> {
         GameSystem::GameBoy => run_gameboy(&rom_path, &cli),
         GameSystem::Nes => nes::run(&rom_path, cli.scale, cli.limit_fps),
         GameSystem::Snes => snes::run(&rom_path, cli.scale, cli.limit_fps),
+        GameSystem::Nds => nds::run(&rom_path, cli.scale, cli.limit_fps),
     }
 }
 

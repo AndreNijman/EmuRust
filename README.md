@@ -1,8 +1,8 @@
-# Retro Launcher (Game Boy / NES / SNES)
+# Retro Launcher (Game Boy / NES / SNES / NDS)
 
-This project is a lightweight retro game launcher with built-in Game Boy, NES, and SNES emulator
-cores (all rendered with SDL2). Drop ROMs into the `games/` directory and run one command to pick a
-title—no external emulators required.
+This project is a lightweight retro game launcher with built-in Game Boy, NES, SNES, and Nintendo DS
+emulator cores (all rendered with SDL2). Drop ROMs into the `games/` directory and run one command
+to pick a title—no external emulators required.
 
 ## Requirements
 
@@ -15,7 +15,7 @@ cargo build --release
 ```
 
 1. Place your ROMs under `games/` (a sample `tetris.gb` is already there).
-2. Just drop your ROMs (`.gb`, `.gbc`, `.nes`, `.sfc`, `.smc`, `.snes`) into `games/`.
+2. Just drop your ROMs (`.gb`, `.gbc`, `.nes`, `.sfc`, `.smc`, `.snes`, `.nds`) into `games/`.
 
 ## Usage
 
@@ -66,6 +66,19 @@ cargo run --release -- --rom games/tetris.gb
 
 SNES battery-backed saves are written to a `.sav` file alongside the ROM.
 
+### Controls (Nintendo DS core)
+
+- Arrow keys: D-pad
+- `X`: A
+- `Z`: B
+- `S`: X
+- `A`: Y
+- `Q`: L
+- `W`: R
+- `Enter`: START
+- `Right Shift` (or `Left Shift` / `Space` / `Backspace`): SELECT
+- Hold the left mouse button on the bottom screen to use the touchscreen stylus
+
 ## Folder Layout
 
 ```
@@ -75,5 +88,5 @@ src/
   ...
 ```
 
-Add more ROMs (GB/GBC/NES/SNES) to the `games/` folder and rerun the launcher whenever you want to
+Add more ROMs (GB/GBC/NES/SNES/NDS) to the `games/` folder and rerun the launcher whenever you want to
 play.
