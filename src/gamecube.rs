@@ -6,6 +6,7 @@ use std::time::{Duration, Instant};
 
 use anyhow::{Context, Result};
 use bitflags::bitflags;
+use font8x8::legacy::BASIC_LEGACY;
 use sdl2::audio::{AudioQueue, AudioSpecDesired};
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
@@ -30,7 +31,18 @@ pub fn run(rom_path: &Path, scale: u32, limit_fps: bool) -> Result<()> {
         .and_then(|s| s.to_str())
         .unwrap_or("GameCube");
     let mut core = GamecubeCore::from_disc(rom_path)?;
-    let mut frontend = GamecubeFrontend::new(title, scale.max(1), limit_fps)?;
+    let meta = core.metadata();
+    log::info!(
+        "Loaded GameCube image \"{}\" (ID {} / maker {}) disc {} version {} streaming={}",
+        meta.title,
+        meta.game_code,
+        meta.maker_code,
+        meta.disc_number.saturating_add(1),
+        meta.version,
+        if meta.streaming { "on" } else { "off" }
+    );
+    let window_title = format!("{} ({})", title, meta.game_code);
+    let mut frontend = GamecubeFrontend::new(&window_title, scale.max(1), limit_fps)?;
     frontend.run(&mut core)
 }
 
@@ -377,6 +389,89 @@ pub struct GamecubeInput {
     pub trigger_r: f32,
 }
 
+#[derive(Debug, Clone)]
+struct GamecubeMetadata {
+    game_code: String,
+    maker_code: String,
+    disc_number: u8,
+    version: u8,
+    streaming: bool,
+    title: String,
+    overlay_lines: [String; 3],
+}
+
+impl GamecubeMetadata {
+    fn parse(bytes: &[u8]) -> Result<Self> {
+        if bytes.len() < 0x60 {
+            anyhow::bail!("GameCube image is missing the boot header");
+        }
+        let game_code = decode_ascii(&bytes[0..4]);
+        let maker_code = decode_ascii(&bytes[4..6]);
+        let disc_number = bytes[6];
+        let version = bytes[7];
+        let streaming = bytes[8] != 0;
+        let title_end = bytes.len().min(0x20 + 0x80);
+        let raw_title = decode_ascii(&bytes[0x20..title_end]);
+        let title = if raw_title.is_empty() {
+            "Unknown Title".to_string()
+        } else {
+            raw_title
+        };
+        let overlay_title = shorten_text(&title, 40);
+        let safe_game_code = if game_code.is_empty() {
+            "----".to_string()
+        } else {
+            game_code.clone()
+        };
+        let safe_maker = if maker_code.is_empty() {
+            "--".to_string()
+        } else {
+            maker_code.clone()
+        };
+        let overlay_lines = [
+            format!("TITLE {}", overlay_title),
+            format!("ID {}  MAKER {}", safe_game_code, safe_maker),
+            format!(
+                "DISC {}  VER {}  STREAM {}",
+                disc_number.saturating_add(1),
+                version,
+                if streaming { "ON" } else { "OFF" }
+            ),
+        ];
+        Ok(Self {
+            game_code,
+            maker_code,
+            disc_number,
+            version,
+            streaming,
+            title,
+            overlay_lines,
+        })
+    }
+}
+
+fn decode_ascii(slice: &[u8]) -> String {
+    let end = slice.iter().position(|&b| b == 0).unwrap_or(slice.len());
+    let trimmed = &slice[..end];
+    String::from_utf8_lossy(trimmed).trim().to_string()
+}
+
+fn shorten_text(input: &str, max_chars: usize) -> String {
+    if input.chars().count() <= max_chars {
+        return input.to_string();
+    }
+    let keep = max_chars.saturating_sub(3);
+    let mut shortened = String::new();
+    for (i, ch) in input.chars().enumerate() {
+        if i >= keep {
+            break;
+        }
+        shortened.push(ch);
+    }
+    shortened.push_str("...");
+    shortened
+}
+
 struct GamecubeCore {
     _disc_bytes: Vec<u8>,
     width: u32,
@@ -385,12 +480,14 @@ struct GamecubeCore {
     audio_buffer: Vec<i16>,
     audio_phase: f32,
     frame_counter: u64,
+    metadata: GamecubeMetadata,
 }
 
 impl GamecubeCore {
     fn from_disc(path: &Path) -> Result<Self> {
         let disc_bytes = fs::read(path)
             .with_context(|| format!("failed to read GameCube image {}", path.display()))?;
+        let metadata = GamecubeMetadata::parse(&disc_bytes)?;
         let width = DEFAULT_WIDTH;
         let height = DEFAULT_HEIGHT;
         Ok(Self {
@@ -401,7 +498,12 @@ impl GamecubeCore {
             audio_buffer: Vec::with_capacity((AUDIO_BUFFER_SAMPLES as usize) * 2),
             audio_phase: 0.0,
             frame_counter: 0,
+            metadata,
         })
+    }
+
+    fn metadata(&self) -> &GamecubeMetadata {
+        &self.metadata
     }
 
     fn dimensions(&self) -> (u32, u32) {
@@ -448,6 +550,7 @@ impl GamecubeCore {
                 frame[y * width + x] = 0xFF00_0000 | (r << 16) | (g << 8) | b;
             }
         }
+        self.overlay_metadata();
     }
 
     fn generate_audio(&mut self, input: &GamecubeInput) {
@@ -474,5 +577,81 @@ impl GamecubeCore {
             let phase_increment = TAU * frequency / AUDIO_SAMPLE_RATE as f32;
             self.audio_phase = (self.audio_phase + phase_increment).rem_euclid(TAU);
         }
+    }
+
+    fn overlay_metadata(&mut self) {
+        const PADDING_X: usize = 14;
+        const PADDING_Y: usize = 14;
+        const LINE_HEIGHT: usize = 9;
+        let lines = self.metadata.overlay_lines.clone();
+        let max_chars = lines.iter().map(|line| line.len()).max().unwrap_or(0);
+        let capped_chars = max_chars.min(60);
+        let rect_width = capped_chars.saturating_mul(8) + PADDING_X * 2;
+        let rect_height = lines.len().saturating_mul(LINE_HEIGHT) + PADDING_Y;
+        self.fill_rect(8, 8, rect_width, rect_height, 0xC010_1010);
+        for (idx, line) in lines.iter().enumerate() {
+            let y = 16 + idx * LINE_HEIGHT;
+            self.draw_text_line(18, y, line, 0xFFFF_FFF0);
+        }
+    }
+
+    fn fill_rect(
+        &mut self,
+        start_x: usize,
+        start_y: usize,
+        width: usize,
+        height: usize,
+        color: u32,
+    ) {
+        let frame_width = self.width as usize;
+        let frame_height = self.height as usize;
+        let max_y = (start_y + height).min(frame_height);
+        let max_x = (start_x + width).min(frame_width);
+        for y in start_y..max_y {
+            let row_offset = y * frame_width;
+            for x in start_x..max_x {
+                self.frame_buffer[row_offset + x] = color;
+            }
+        }
+    }
+
+    fn draw_text_line(&mut self, start_x: usize, start_y: usize, text: &str, color: u32) {
+        for (idx, ch) in text.chars().enumerate() {
+            self.draw_char(start_x + idx * 8, start_y, ch, color);
+        }
+    }
+
+    fn draw_char(&mut self, start_x: usize, start_y: usize, ch: char, color: u32) {
+        if ch == ' ' {
+            return;
+        }
+        let glyph = glyph_for(ch);
+        let frame_width = self.width as usize;
+        let frame_height = self.height as usize;
+        for (row, row_bits) in glyph.iter().enumerate() {
+            let y = start_y + row;
+            if y >= frame_height {
+                break;
+            }
+            for col in 0..8 {
+                if (row_bits >> col) & 1 == 0 {
+                    continue;
+                }
+                let x = start_x + col;
+                if x >= frame_width {
+                    continue;
+                }
+                self.frame_buffer[y * frame_width + x] = color;
+            }
+        }
+    }
+}
+
+fn glyph_for(ch: char) -> [u8; 8] {
+    let idx = ch as usize;
+    if idx < BASIC_LEGACY.len() {
+        BASIC_LEGACY[idx]
+    } else {
+        BASIC_LEGACY['?' as usize]
     }
 }

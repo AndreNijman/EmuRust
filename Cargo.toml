@@ -16,6 +16,7 @@ gc_nes_core = "0.1"
 meru-interface = "0.3"
 super-sabicom = "0.2"
 bitflags = "2.4"
+font8x8 = "0.3"
 
 [patch.crates-io]
 gameboy_core = { path = "crates/gameboy_core" }

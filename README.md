@@ -42,6 +42,10 @@ console d-pads, `A/B/X/Y` map to the respective face buttons, shoulder buttons m
 maps to START, and `Back/Select` maps to SELECT. Nintendo DS titles still require a mouse for the
 touchscreen, but all handheld/console buttons can be driven from the controller.
 
+GameCube titles additionally parse the disc header on load—the launcher prints the game ID, maker,
+disc, and streaming flags to the console and an overlay in the top-left corner of the window mirrors
+that metadata so you can quickly confirm which image you booted.
+
 ### Controls (Game Boy built-in core)
 
 - Arrow keys: D-pad
@@ -85,6 +89,17 @@ SNES battery-backed saves are written to a `.sav` file alongside the ROM.
 - `Enter`: START
 - `Right Shift` (or `Left Shift` / `Space` / `Backspace`): SELECT
 - Hold the left mouse button on the bottom screen to use the touchscreen stylus
+
+### Controls (GameCube core)
+
+- Arrow keys / Controller d-pad or left stick: main stick + D-pad
+- `X`: A, `Z`: B, `S`: X, `A`: Y
+- `E` or either Shift key / controller Back-Select: Z
+- `Q`: L, `W`: R (digital shoulders)
+- `U` / `O`: analog L / R trigger sweep (controllers use their triggers automatically)
+- `J` / `L` / `I` / `K`: C-stick (right stick)
+- `Enter`: START
+- `Esc` / window close: exit
 
 ## Folder Layout
 
