@@ -1,8 +1,10 @@
 use std::collections::HashSet;
+use std::env;
 use std::f32::consts::TAU;
 use std::fs::{self, File};
 use std::io::Read;
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use std::process::Command;
 use std::time::{Duration, Instant};
 
 use anyhow::{Context, Result};
@@ -16,6 +18,8 @@ use sdl2::pixels::PixelFormatEnum;
 use sdl2::render::{Canvas, Texture};
 use sdl2::video::Window;
 
+use which::which;
+
 use crate::controller::{ControllerManager, VirtualButton};
 
 const DEFAULT_WIDTH: u32 = 640;
@@ -26,6 +30,74 @@ const AUDIO_CHANNELS: u16 = 2;
 const AUDIO_BUFFER_SAMPLES: u16 = 1024;
 const MAX_AUDIO_LATENCY_BYTES: u32 =
     (AUDIO_SAMPLE_RATE as u32) * (AUDIO_CHANNELS as u32) * std::mem::size_of::<i16>() as u32;
+
+fn try_launch_dolphin(rom_path: &Path) -> Result<bool> {
+    let Some(binary) = resolve_dolphin_binary()? else {
+        log::debug!("Dolphin binary not found; falling back to built-in stub core");
+        return Ok(false);
+    };
+    log::info!(
+        "Launching Dolphin core via {} for {}",
+        binary.display(),
+        rom_path.display()
+    );
+    let status = Command::new(&binary)
+        .arg("-b")
+        .arg("-e")
+        .arg(rom_path)
+        .status()
+        .with_context(|| format!("failed to spawn Dolphin binary at {}", binary.display()))?;
+    if !status.success() {
+        return Err(anyhow::anyhow!(
+            "Dolphin exited with status {status}; check the external emulator logs"
+        ));
+    }
+    Ok(true)
+}
+
+fn resolve_dolphin_binary() -> Result<Option<PathBuf>> {
+    if let Ok(path) = env::var("DOLPHIN_BIN") {
+        if !path.is_empty() {
+            let bin = PathBuf::from(path);
+            if bin.exists() {
+                return Ok(Some(bin));
+            }
+        }
+    }
+    for candidate in dolphin_candidate_bins() {
+        if let Ok(path) = which(candidate) {
+            return Ok(Some(path));
+        }
+    }
+    for location in dolphin_candidate_paths() {
+        if location.exists() {
+            return Ok(Some(location));
+        }
+    }
+    Ok(None)
+}
+
+fn dolphin_candidate_bins() -> &'static [&'static str] {
+    &[
+        "dolphin-emu-nogui",
+        "dolphin-emu",
+        "dolphin",
+        "Dolphin",
+        "Dolphin.exe",
+    ]
+}
+
+fn dolphin_candidate_paths() -> Vec<PathBuf> {
+    let mut paths = Vec::new();
+    paths.push(PathBuf::from(
+        "/Applications/Dolphin.app/Contents/MacOS/Dolphin",
+    ));
+    paths.push(PathBuf::from("C:\\Program Files\\Dolphin\\Dolphin.exe"));
+    paths.push(PathBuf::from(
+        "C:\\Program Files (x86)\\Dolphin\\Dolphin.exe",
+    ));
+    paths
+}
 
 fn load_gamecube_image(path: &Path) -> Result<Vec<u8>> {
     match path
@@ -55,6 +127,9 @@ fn load_rvz_image(path: &Path) -> Result<Vec<u8>> {
 }
 
 pub fn run(rom_path: &Path, scale: u32, limit_fps: bool) -> Result<()> {
+    if try_launch_dolphin(rom_path)? {
+        return Ok(());
+    }
     let title = rom_path
         .file_stem()
         .and_then(|s| s.to_str())
