@@ -1,6 +1,6 @@
-# Retro Launcher (Game Boy / NES / SNES / NDS)
+# Retro Launcher (Game Boy / NES / SNES / NDS / GameCube)
 
-This project is a lightweight retro game launcher with built-in Game Boy, NES, SNES, and Nintendo DS
+This project is a lightweight retro game launcher with built-in Game Boy, NES, SNES, Nintendo DS, and GameCube
 emulator cores (all rendered with SDL2). Drop ROMs into the `games/` directory and run one command
 to pick a title—no external emulators required.
 
@@ -15,7 +15,7 @@ cargo build --release
 ```
 
 1. Place your ROMs under `games/` (a sample `tetris.gb` is already there).
-2. Just drop your ROMs (`.gb`, `.gbc`, `.nes`, `.sfc`, `.smc`, `.snes`, `.nds`) into `games/`.
+2. Just drop your ROMs (`.gb`, `.gbc`, `.nes`, `.sfc`, `.smc`, `.snes`, `.nds`, `.iso`, `.gcm`, `.gcz`, `.gcn`) into `games/`.
 
 ## Usage
 

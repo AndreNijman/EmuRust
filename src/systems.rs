@@ -8,6 +8,7 @@ pub enum GameSystem {
     Nes,
     Snes,
     Nds,
+    GameCube,
 }
 
 pub fn detect_system(path: &Path) -> Result<GameSystem> {
@@ -22,6 +23,7 @@ pub fn detect_system(path: &Path) -> Result<GameSystem> {
         "nes" => Ok(GameSystem::Nes),
         "sfc" | "smc" | "snes" => Ok(GameSystem::Snes),
         "nds" => Ok(GameSystem::Nds),
+        "iso" | "gcm" | "gcz" | "gcn" | "ciso" | "dol" => Ok(GameSystem::GameCube),
         other => Err(anyhow!("unsupported ROM extension: {}", other)),
     }
 }
