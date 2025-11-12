@@ -4,7 +4,10 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result, bail};
 
-const SUPPORTED_EXTENSIONS: [&str; 7] = ["gb", "gbc", "nes", "sfc", "smc", "snes", "nds"];
+const SUPPORTED_EXTENSIONS: [&str; 14] = [
+    "gb", "gbc", "nes", "sfc", "smc", "snes", "nds", "iso", "gcm", "gcz", "gcn", "ciso", "dol",
+    "rvz",
+];
 
 pub fn select_game(dir: &Path) -> Result<PathBuf> {
     let mut entries: Vec<PathBuf> = fs::read_dir(dir)
