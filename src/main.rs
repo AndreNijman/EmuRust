@@ -5,6 +5,7 @@ mod gamecube;
 mod interactive;
 mod launcher;
 mod nds;
+mod n64;
 mod nes;
 mod rtc;
 mod snes;
@@ -62,6 +63,7 @@ fn main() -> Result<()> {
         GameSystem::Nes => nes::run(&rom_path, cli.scale, cli.limit_fps),
         GameSystem::Snes => snes::run(&rom_path, cli.scale, cli.limit_fps),
         GameSystem::Nds => nds::run(&rom_path, cli.scale, cli.limit_fps),
+        GameSystem::N64 => n64::run(&rom_path, cli.scale, cli.limit_fps),
         GameSystem::GameCube => gamecube::run(&rom_path, cli.scale, cli.limit_fps),
     }
 }

@@ -19,6 +19,9 @@ bitflags = "2.4"
 font8x8 = "0.3"
 rvz = "0.1"
 which = "6"
+mupen64plus = "0.3"
+dirs = "6"
+libloading = "0.9"
 
 [patch.crates-io]
 gameboy_core = { path = "crates/gameboy_core" }

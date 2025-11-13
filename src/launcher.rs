@@ -8,9 +8,9 @@ use log::warn;
 
 use crate::systems::{detect_system, GameSystem};
 
-const SUPPORTED_EXTENSIONS: [&str; 14] = [
-    "gb", "gbc", "nes", "sfc", "smc", "snes", "nds", "iso", "gcm", "gcz", "gcn", "ciso", "dol",
-    "rvz",
+const SUPPORTED_EXTENSIONS: [&str; 17] = [
+    "gb", "gbc", "nes", "sfc", "smc", "snes", "nds", "n64", "z64", "v64", "iso", "gcm", "gcz",
+    "gcn", "ciso", "dol", "rvz",
 ];
 
 #[derive(Clone)]
