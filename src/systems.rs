@@ -1,14 +1,32 @@
-use std::path::Path;
+use std::{fmt, path::Path};
 
 use anyhow::{Result, anyhow};
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum GameSystem {
     GameBoy,
     Nes,
     Snes,
     Nds,
     GameCube,
+}
+
+impl GameSystem {
+    pub fn label(&self) -> &'static str {
+        match self {
+            GameSystem::GameBoy => "Game Boy / Color",
+            GameSystem::Nes => "NES",
+            GameSystem::Snes => "SNES",
+            GameSystem::Nds => "Nintendo DS",
+            GameSystem::GameCube => "GameCube",
+        }
+    }
+}
+
+impl fmt::Display for GameSystem {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.label())
+    }
 }
 
 pub fn detect_system(path: &Path) -> Result<GameSystem> {
