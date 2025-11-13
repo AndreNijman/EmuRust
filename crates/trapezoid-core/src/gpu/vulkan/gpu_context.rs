@@ -46,6 +46,10 @@ use crate::gpu::DrawingTextureParams;
 use crate::gpu::DrawingVertex;
 use crate::gpu::GpuStateSnapshot;
 
+const VRAM_WIDTH: u32 = 1024;
+const VRAM_HEIGHT: u32 = 512;
+const VRAM_WIDTH_24BIT: u32 = (VRAM_WIDTH * 2) / 3;
+
 use std::sync::Arc;
 use std::{ops::Range, sync::mpsc};
 
@@ -224,7 +228,7 @@ impl GpuContext {
             memory_allocator.clone(),
             ImageCreateInfo {
                 image_type: ImageType::Dim2d,
-                extent: [1024, 512, 1],
+                extent: [VRAM_WIDTH, VRAM_HEIGHT, 1],
                 format: Format::A1R5G5B5_UNORM_PACK16,
                 usage: ImageUsage::TRANSFER_SRC
                     | ImageUsage::TRANSFER_DST
@@ -240,7 +244,7 @@ impl GpuContext {
             memory_allocator.clone(),
             ImageCreateInfo {
                 image_type: ImageType::Dim2d,
-                extent: [1024, 512, 1],
+                extent: [VRAM_WIDTH, VRAM_HEIGHT, 1],
                 format: Format::A1R5G5B5_UNORM_PACK16,
                 usage: ImageUsage::TRANSFER_DST | ImageUsage::SAMPLED,
                 ..Default::default()
@@ -1190,8 +1194,8 @@ impl GpuContext {
         self.check_and_flush_buffered_draws(None);
         self.flush_command_builder();
 
-        let (mut topleft, size) = if full_vram {
-            ([0; 2], [1024, 512])
+        let (topleft, size) = if full_vram {
+            ([0; 2], [VRAM_WIDTH, VRAM_HEIGHT])
         } else {
             // (((X2-X1)/cycles_per_pix)+2) AND NOT 3
             let mut horizontal_size = (((state_snapshot.display_horizontal_range.1
@@ -1221,10 +1225,16 @@ impl GpuContext {
             )
         };
 
-        // the rendering offset is more of a byte offset than pixel offset
-        // so in 24bit mode, we have to change that.
-        if gpu_stat.is_24bit_color_depth() {
-            topleft[0] = (topleft[0] * 2) / 3;
+        let is_24bit = !full_vram && gpu_stat.is_24bit_color_depth();
+        let mut sample_topleft = topleft;
+        let mut sample_size = size;
+        let mut source_extent = [VRAM_WIDTH, VRAM_HEIGHT];
+
+        if is_24bit {
+            source_extent[0] = VRAM_WIDTH_24BIT;
+            sample_topleft[0] = ((sample_topleft[0] as u64) * 2 / 3) as u32;
+            let available = source_extent[0].saturating_sub(sample_topleft[0]);
+            sample_size[0] = sample_size[0].min(available);
         }
 
         let front_image = Image::new(
@@ -1246,9 +1256,10 @@ impl GpuContext {
         self.front_blit
             .blit(
                 front_image.clone(),
-                topleft,
-                size,
-                !full_vram && gpu_stat.is_24bit_color_depth(),
+                sample_topleft,
+                sample_size,
+                source_extent,
+                is_24bit,
                 self.gpu_future.take().unwrap(),
             )
             .then_signal_fence_and_flush()

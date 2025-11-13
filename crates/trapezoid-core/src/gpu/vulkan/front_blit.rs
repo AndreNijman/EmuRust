@@ -42,9 +42,9 @@ use vulkano::{
 
 const VRAM_WIDTH_WORDS: u32 = 1024;
 const VRAM_HEIGHT: u32 = 512;
-const COMPUTE_24BIT_BYTES_PER_ROW: u32 = VRAM_WIDTH_WORDS * 2;
-const COMPUTE_24BIT_PAIR_BYTES: u32 = 6;
-const COMPUTE_24BIT_ROW_OPERATIONS: u32 = COMPUTE_24BIT_BYTES_PER_ROW / COMPUTE_24BIT_PAIR_BYTES;
+const VRAM_BYTES_PER_ROW: u32 = VRAM_WIDTH_WORDS * 2;
+const VRAM_WIDTH_24BIT: u32 = VRAM_BYTES_PER_ROW / 3;
+const COMPUTE_24BIT_ROW_OPERATIONS: u32 = (VRAM_WIDTH_24BIT + 1) / 2;
 const COMPUTE_LOCAL_SIZE_XY: u32 = 8;
 
 mod vs {
@@ -59,13 +59,15 @@ layout(location = 0) out vec2 tex_coords;
 layout(push_constant) uniform PushConstantData {
     uvec2 topleft;
     uvec2 size;
+    uvec2 extent;
 } pc;
 
 void main() {
     gl_Position = vec4(position, 0.0, 1.0);
 
-    vec2 topleft = vec2(pc.topleft.x / 1024.0, pc.topleft.y / 512.0);
-    vec2 size = vec2(pc.size.x / 1024.0, pc.size.y / 512.0);
+    vec2 inv_extent = vec2(pc.extent);
+    vec2 topleft = vec2(pc.topleft) / inv_extent;
+    vec2 size = vec2(pc.size) / inv_extent;
 
     tex_coords = (position  + 1.0) / 2.0;
     tex_coords = tex_coords * size + topleft;
@@ -101,9 +103,9 @@ layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 const uint VRAM_WIDTH_WORDS = 1024u;
 const uint VRAM_HEIGHT = 512u;
 const uint BYTES_PER_ROW = VRAM_WIDTH_WORDS * 2u;
+const uint OUTPUT_ROW_WIDTH = (BYTES_PER_ROW / 3u);
 const uint PAIR_BYTES = 6u;
-const uint ROW_OPERATIONS = BYTES_PER_ROW / PAIR_BYTES;
-const uint OUTPUT_ROW_WIDTH = 1024u;
+const uint ROW_OPERATIONS = (OUTPUT_ROW_WIDTH + 1u) / 2u;
 
 layout(set = 0, binding = 0) readonly buffer InData {
     uint data[];
@@ -139,6 +141,9 @@ void main() {
     }
 
     uint base_byte = y * BYTES_PER_ROW + x * PAIR_BYTES;
+    if (base_byte + (PAIR_BYTES - 1u) >= y * BYTES_PER_ROW + BYTES_PER_ROW) {
+        return;
+    }
     uvec3 rgb0 = read_rgb(base_byte);
     uvec3 rgb1 = read_rgb(base_byte + 3u);
 
@@ -283,7 +288,7 @@ impl FrontBlit {
                 image_type: ImageType::Dim2d,
                 format: Format::B8G8R8A8_UNORM,
                 usage: ImageUsage::TRANSFER_DST | ImageUsage::SAMPLED,
-                extent: [1024, 512, 1],
+                extent: [VRAM_WIDTH_24BIT, VRAM_HEIGHT, 1],
                 ..Default::default()
             },
             AllocationCreateInfo::default(),
@@ -314,7 +319,7 @@ impl FrontBlit {
                 memory_type_filter: MemoryTypeFilter::PREFER_DEVICE,
                 ..Default::default()
             },
-            1024 * 512,
+            (VRAM_WIDTH_24BIT * VRAM_HEIGHT) as u64,
         )
         .unwrap();
 
@@ -379,6 +384,7 @@ impl FrontBlit {
         dest_image: Arc<Image>,
         topleft: [u32; 2],
         size: [u32; 2],
+        source_extent: [u32; 2],
         is_24bit_color_depth: bool,
         mut in_future: IF,
     ) -> CommandBufferExecFuture<IF>
@@ -481,7 +487,11 @@ impl FrontBlit {
         )
         .unwrap();
 
-        let push_constants = vs::PushConstantData { topleft, size };
+        let push_constants = vs::PushConstantData {
+            topleft,
+            size,
+            extent: source_extent,
+        };
 
         builder
             .begin_render_pass(
