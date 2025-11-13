@@ -9,6 +9,7 @@ mod nds;
 mod nes;
 mod rtc;
 mod snes;
+mod ps1;
 mod systems;
 
 use std::fs;
@@ -45,6 +46,10 @@ struct Cli {
     /// Limit interactive window to ~60 FPS (pass --limit-fps=false to disable)
     #[arg(long, default_value_t = true)]
     limit_fps: bool,
+
+    /// Path to a PlayStation BIOS image (fallbacks to PS1_BIOS/PSX_BIOS env vars + bios/ps1/)
+    #[arg(long)]
+    ps1_bios: Option<PathBuf>,
 }
 
 fn main() -> Result<()> {
@@ -63,6 +68,7 @@ fn main() -> Result<()> {
         GameSystem::Nes => nes::run(&rom_path, cli.scale, cli.limit_fps),
         GameSystem::Snes => snes::run(&rom_path, cli.scale, cli.limit_fps),
         GameSystem::Nds => nds::run(&rom_path, cli.scale, cli.limit_fps),
+        GameSystem::Ps1 => ps1::run(&rom_path, cli.scale, cli.limit_fps, cli.ps1_bios.clone()),
         GameSystem::N64 => n64::run(&rom_path, cli.scale, cli.limit_fps),
         GameSystem::GameCube => gamecube::run(&rom_path, cli.scale, cli.limit_fps),
     }

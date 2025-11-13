@@ -25,6 +25,9 @@ libloading = "0.9"
 flate2 = "1.0"
 tar = "0.4"
 ureq = { version = "2.9", default-features = true, features = ["tls"] }
+trapezoid-core = "0.3"
+vulkano = "0.35"
+winit = { version = "0.30", features = ["rwh_05"] }
 
 [patch.crates-io]
 gameboy_core = { path = "crates/gameboy_core" }
