@@ -1,10 +1,10 @@
-# Retro Launcher (Game Boy / NES / SNES / NDS / Nintendo 64 / GameCube)
+# Retro Launcher (Game Boy / NES / SNES / NDS / PlayStation / Nintendo 64 / GameCube)
 
-This project is a lightweight retro game launcher with built-in Game Boy, NES, SNES, Nintendo DS, and
-Nintendo 64 emulator cores (all rendered with SDL2). Drop ROMs into the `games/` directory and run
-one command to pick a title—no external emulators required for any of the handheld or console cores
-listed above. GameCube titles still hand off to Dolphin automatically when it is installed so you get
-full-speed emulation there as well.
+This project is a lightweight retro game launcher with built-in Game Boy, NES, SNES, Nintendo DS,
+PlayStation, and Nintendo 64 emulator cores. Drop ROMs into the `games/` directory and run one
+command to pick a title—no external emulators required for any of the handheld or console cores
+listed above. GameCube titles still hand off to Dolphin automatically when it is installed so you
+get full-speed emulation there as well.
 
 ## Requirements
 
@@ -15,6 +15,10 @@ full-speed emulation there as well.
   dynamically load `libmupen64plus` along with `mupen64plus-video-*`, `mupen64plus-audio-*`,
   `mupen64plus-input-*`, and `mupen64plus-rsp-*`.
 - Dolphin emulator binary (optional, for full GameCube emulation—set `DOLPHIN_BIN` or place Dolphin on your `PATH`)
+- Vulkan 1.1 runtime + GPU drivers (MoltenVK on macOS, `vulkan-loader`/`mesa-vulkan-drivers` on Linux, and up-to-date
+  GPU drivers on Windows) for the built-in PlayStation core powered by `trapezoid-core`.
+- A PlayStation BIOS (`SCPH1001.bin`, `SCPH5501.bin`, etc.) stored at `bios/ps1/` or pointed to with the
+  `PS1_BIOS`/`PSX_BIOS` environment variable (or `--ps1-bios` on the CLI).
 - Nothing else—every handheld plus Nintendo 64 ships in-tree or is loaded automatically at runtime, so you do
   not need BIOS dumps or ROM-specific patches for those systems.
 ## Setup
@@ -24,7 +28,7 @@ cargo build --release
 ```
 
 1. Place your ROMs under `games/` (a sample `tetris.gb` is already there).
-2. Just drop your ROMs (`.gb`, `.gbc`, `.nes`, `.sfc`, `.smc`, `.snes`, `.nds`, `.n64`, `.z64`, `.v64`, `.iso`, `.gcm`, `.gcz`, `.gcn`, `.rvz`, `.ciso`) into `games/`.
+2. Just drop your ROMs (`.gb`, `.gbc`, `.nes`, `.sfc`, `.smc`, `.snes`, `.nds`, `.cue`, `.exe`, `.n64`, `.z64`, `.v64`, `.iso`, `.gcm`, `.gcz`, `.gcn`, `.rvz`, `.ciso`) into `games/`.
 
 ### Nintendo 64 setup notes
 
@@ -69,15 +73,40 @@ Nintendo 64 titles work the same way—just point at one of the supported cartri
 cargo run --release -- --rom "games/Mario Kart 64.z64"
 ```
 
+PlayStation discs are identical—pass the `.cue` file (plus `--ps1-bios ...` if you have not set
+`PS1_BIOS`/`PSX_BIOS`):
+
+```bash
+cargo run --release -- --rom "games/Crash Bandicoot.cue" --ps1-bios bios/ps1/scph1001.bin
+```
+
 > **Frame pacing**: Windows default to ~60 FPS so titles run at their intended speed. Pass
 > `--limit-fps=false` only if you explicitly want uncapped rendering (useful for debugging).
+
+### PlayStation setup notes
+
+The PlayStation 1 core embeds [`trapezoid-core`](https://crates.io/crates/trapezoid-core) directly, so the
+launcher needs a few extra assets on disk:
+
+1. **BIOS** – place `SCPH1001.bin`, `SCPH5501.bin`, or another NTSC BIOS image under `bios/ps1/`
+   (filenames are matched case-insensitively), or point the launcher at a BIOS by passing
+   `--ps1-bios /path/to/SCPH1001.bin` or exporting `PS1_BIOS=/path/to/SCPH1001.bin`
+   (`PSX_BIOS` is also honored). The file must exist and will be fed directly into the emulator core.
+2. **ROM formats** – disc games should be launched via their `.cue` sheet so the emulator can follow
+   the referenced `.bin` tracks; PS-EXE homebrew files (`.exe`) are also supported. Keep the `.bin`
+   payload next to the `.cue` file just like you would for other PS1 frontends.
+3. **Vulkan runtime** – ensure `vulkaninfo` works (MoltenVK on macOS, up-to-date AMD/NVIDIA/Intel
+   drivers on Windows, and the `vulkan-loader`/`mesa-vulkan-drivers` packages on Linux).
+4. **Memory cards** – the core automatically reads/writes `memcard0.mcd` and `memcard1.mcd` in the
+   current working directory so saves persist between runs.
 
 ## Controller Support
 
 Any SDL2-compatible gamepad works across every built-in core. The d-pad (or left stick) maps to the
 console d-pads, `A/B/X/Y` map to the respective face buttons, and the shoulder buttons map to L/R. On
 Nintendo 64 the right stick drives the C-buttons and the left trigger (or Back/Select) becomes the Z
-trigger; GameCube follows the same pattern for its C-stick and analog triggers. `Start` maps to START
+trigger; PlayStation follows the same layout (A=Cross, B=Circle, X=Square, Y=Triangle) with analog
+triggers feeding L2/R2, and GameCube mirrors that pattern for its C-stick and analog triggers. `Start` maps to START
 everywhere, while `Back/Select` continues to feed SELECT on systems that have it. Nintendo DS titles
 still require a mouse for the touchscreen, but all handheld/console buttons can be driven from the
 controller.
@@ -113,10 +142,11 @@ the executable is either on `PATH` or the absolute path is assigned to `DOLPHIN_
 | NES      | Built-in Rust core (`gc_nes_core`)                                                               |
 | SNES     | Built-in Rust core (`super-sabicom` via `meru-interface`)                                        |
 | Nintendo DS | Built-in Rust core (`desmume-rs`)                                                             |
+| PlayStation | Built-in [`trapezoid-core`](https://crates.io/crates/trapezoid-core`) + Vulkan renderer (via `vulkano`/`winit`) |
 | Nintendo 64 | Embedded [Mupen64Plus](https://mupen64plus.org/) core loaded at runtime (libmupen64plus + plugins) |
 | GameCube | **External** Dolphin binary (auto-detected via `DOLPHIN_BIN` or `PATH`); stub visualization runs only when Dolphin is missing |
 
-All of the built-in rows (Game Boy through Nintendo 64) compile directly into the launcher binary.
+All of the built-in rows (Game Boy through PlayStation and Nintendo 64) compile directly into the launcher binary.
 GameCube requires the external Dolphin install described above in order to play games; without it
 you’ll just see the metadata overlay and placeholder graphics.
 
@@ -164,6 +194,19 @@ SNES battery-backed saves are written to a `.sav` file alongside the ROM.
 - `Right Shift` (or `Left Shift` / `Space` / `Backspace`): SELECT
 - Hold the left mouse button on the bottom screen to use the touchscreen stylus
 
+### Controls (PlayStation core)
+
+- Arrow keys: D-pad
+- `Z`: Cross (X)
+- `X`: Circle
+- `A`: Square
+- `S`: Triangle
+- `Q`: L1, `W`: R1
+- `1`: L2, `2`: R2
+- `Enter`: START
+- `Right Shift` (or `Space` / `Backspace`): SELECT
+- `Esc` / window close: exit
+
 ### Controls (Nintendo 64 core)
 
 - Arrow keys / Controller d-pad or left stick: analog stick (full range) plus the digital pad
@@ -195,9 +238,12 @@ SNES battery-backed saves are written to a `.sav` file alongside the ROM.
 ```
 games/
   tetris.gb         # sample Game Boy ROM
+bios/
+  ps1/
+    SCPH1001.bin    # place your BIOS dump here (or point --ps1-bios / PS1_BIOS to it)
 src/
   ...
 ```
 
-Add more ROMs (GB/GBC/NES/SNES/NDS/N64/GameCube) to the `games/` folder and rerun the launcher whenever you want to
+Add more ROMs (GB/GBC/NES/SNES/NDS/PS1/N64/GameCube) to the `games/` folder and rerun the launcher whenever you want to
 play.
