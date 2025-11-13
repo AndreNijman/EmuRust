@@ -1,0 +1,42 @@
+[package]
+name = "trapezoid-core"
+version = "0.3.0"
+authors = ["Amjad Alsharafi <amjadsharafi10@gmail.com>"]
+edition = "2021"
+readme = "README.md"
+description = "A PSX emulator, backed by vulkano for rendering"
+license = "MIT"
+repository = "https://github.com/Amjad50/trapezoid"
+keywords = ["psx", "emulator", "vulkan", "rust"]
+categories = ["emulators", "games"]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[features]
+default = ["vulkan"]
+# Enable `vulkan` backend rendering, and also correct GPU emulation,
+# without this, GPU emulation will be not working as expected
+vulkan = ["vulkano", "vulkano-shaders"]
+# Enable support for CPU debugger API
+debugger = []
+
+[dependencies]
+byteorder = "1.5"
+log = "0.4"
+bitflags = "2.9"
+
+vulkano = { version = "0.35", optional = true }
+vulkano-shaders = { version = "0.35", optional = true }
+
+[dev-dependencies]
+env_logger = { version = "0.11", default-features = false, features = ["auto-color"] }
+
+[[example]]
+name = "trapezoid_cpu"
+path = "examples/trapezoid_cpu.rs"
+required-features = []
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+rustc-args = ["--cfg", "docsrs"]

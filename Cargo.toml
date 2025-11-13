@@ -32,3 +32,4 @@ winit = { version = "0.30", features = ["rwh_05"] }
 [patch.crates-io]
 gameboy_core = { path = "crates/gameboy_core" }
 mupen64plus-sys = { path = "crates/mupen64plus-sys" }
+trapezoid-core = { path = "crates/trapezoid-core" }

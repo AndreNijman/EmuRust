@@ -2593,8 +2593,6 @@ checksum = "b9d12581f227e93f094d3af2ae690a574abb8a2b9b7a96e7cfe9647b2b617678"
 [[package]]
 name = "trapezoid-core"
 version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c0f5f5adb3d33b17f752ba4b00ebe6016bef24f4fe1202d91f286a44828686de"
 dependencies = [
  "bitflags 2.10.0",
  "byteorder",

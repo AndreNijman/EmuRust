@@ -752,10 +752,22 @@ fn resolve_bios_path(bios_override: Option<PathBuf>) -> Result<PathBuf> {
 }
 
 fn default_bios_candidates() -> Vec<PathBuf> {
-    let mut paths = Vec::with_capacity(BIOS_CANDIDATE_NAMES.len() * 2);
-    for base in ["bios/ps1", "bios"] {
+    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let mut bases = vec![
+        PathBuf::from("bios/ps1"),
+        PathBuf::from("bios"),
+        PathBuf::from("."),
+    ];
+    bases.extend([
+        manifest_dir.join("bios/ps1"),
+        manifest_dir.join("bios"),
+        manifest_dir.clone(),
+    ]);
+
+    let mut paths = Vec::with_capacity(BIOS_CANDIDATE_NAMES.len() * bases.len());
+    for base in bases {
         for name in BIOS_CANDIDATE_NAMES {
-            paths.push(PathBuf::from(base).join(name));
+            paths.push(base.join(name));
         }
     }
     paths
