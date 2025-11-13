@@ -1,21 +1,25 @@
 use std::env;
 use std::fs;
+use std::io::{Cursor, Read};
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result, anyhow, bail};
-use dirs::config_dir;
+use dirs::{cache_dir, config_dir};
+use flate2::read::GzDecoder;
 use libloading::library_filename;
 use log::{debug, info};
 use mupen64plus::{Core, Plugin};
+use tar::Archive;
 
 pub fn run(rom_path: &Path, scale: u32, limit_fps: bool) -> Result<()> {
     let mut rom = fs::read(rom_path)
         .with_context(|| format!("failed to read Nintendo 64 ROM {}", rom_path.display()))?;
-    let core_setup = load_core()?;
-    let plugin_dirs = plugin_search_dirs(core_setup.library_dir.as_deref());
+    let bundled = ensure_bundled_assets()?;
+    let core_setup = load_core(bundled.as_ref())?;
+    let plugin_dirs = plugin_search_dirs(core_setup.library_dir.as_deref(), bundled.as_ref());
     let plugins = resolve_plugins(&plugin_dirs)?;
     let config_dir = ensure_config_dir()?;
-    let data_dir = resolve_data_dir(core_setup.library_dir.as_deref());
+    let data_dir = resolve_data_dir(core_setup.library_dir.as_deref(), bundled.as_ref());
 
     if scale != 4 || !limit_fps {
         debug!("Nintendo 64 core uses the video plugin's window; --scale/--limit-fps are ignored");
@@ -77,7 +81,31 @@ struct CoreSetup {
     origin_description: String,
 }
 
-fn load_core() -> Result<CoreSetup> {
+#[derive(Clone)]
+struct BundledAssets {
+    core_path: PathBuf,
+    plugin_dir: PathBuf,
+    data_dir: PathBuf,
+    description: String,
+}
+
+fn load_core(bundled: Option<&BundledAssets>) -> Result<CoreSetup> {
+    if let Some(bundle) = bundled {
+        let core = Core::load_from_path(&bundle.core_path)
+            .map_err(|err| anyhow!(err))
+            .with_context(|| {
+                format!(
+                    "failed to load bundled core at {}",
+                    bundle.core_path.display()
+                )
+            })?;
+        return Ok(CoreSetup {
+            library_dir: bundle.core_path.parent().map(|p| p.to_path_buf()),
+            origin_description: format!("{} (auto-downloaded)", bundle.description),
+            core,
+        });
+    }
+
     if let Some(explicit) = env_path("M64P_CORE_LIB") {
         let core = Core::load_from_path(&explicit)
             .map_err(|err| anyhow!(err))
@@ -175,11 +203,14 @@ fn ensure_config_dir() -> Result<Option<PathBuf>> {
     }
 }
 
-fn resolve_data_dir(core_dir: Option<&Path>) -> Option<PathBuf> {
+fn resolve_data_dir(core_dir: Option<&Path>, bundled: Option<&BundledAssets>) -> Option<PathBuf> {
     if let Some(explicit) = env_path("M64P_DATA_DIR") {
         if explicit.exists() {
             return Some(explicit);
         }
+    }
+    if let Some(bundle) = bundled {
+        return Some(bundle.data_dir.clone());
     }
     let mut candidates = Vec::new();
     if let Some(root) = env_path("M64P_ROOT") {
@@ -196,8 +227,11 @@ fn resolve_data_dir(core_dir: Option<&Path>) -> Option<PathBuf> {
     candidates.into_iter().find(|path| path.exists())
 }
 
-fn plugin_search_dirs(core_dir: Option<&Path>) -> Vec<PathBuf> {
+fn plugin_search_dirs(core_dir: Option<&Path>, bundled: Option<&BundledAssets>) -> Vec<PathBuf> {
     let mut dirs = Vec::new();
+    if let Some(bundle) = bundled {
+        push_unique(&mut dirs, bundle.plugin_dir.clone());
+    }
     dirs.extend(env_paths("M64P_PLUGIN_DIR"));
     if let Some(root) = env_path("M64P_ROOT") {
         push_unique(&mut dirs, root.clone());
@@ -341,3 +375,61 @@ const RSP_PLUGIN_CANDIDATES: &[&str] = &[
     "mupen64plus-rsp-cxd4-sse2",
     "mupen64plus-rsp-z64",
 ];
+
+fn ensure_bundled_assets() -> Result<Option<BundledAssets>> {
+    #[cfg(target_os = "linux")]
+    {
+        const VERSION: &str = "2.5.9";
+        const DIR_NAME: &str = "mupen64plus-bundle-linux64-2.5.9";
+        const URL: &str = "https://github.com/Mupen64Plus/mupen64plus-core/releases/download/2.5.9/mupen64plus-bundle-linux64-2.5.9.tar.gz";
+
+        let cache_root = cache_dir()
+            .unwrap_or_else(|| PathBuf::from("target/cache"))
+            .join("retro-launcher")
+            .join("mupen64plus")
+            .join("linux64")
+            .join(VERSION);
+        let extracted = cache_root.join(DIR_NAME);
+        let core_path = extracted.join("libmupen64plus.so");
+        if !core_path.exists() {
+            info!(
+                "Downloading bundled Mupen64Plus {} (once per machine)...",
+                VERSION
+            );
+            download_and_extract(URL, &cache_root)
+                .context("failed to bootstrap bundled Mupen64Plus")?;
+        }
+        if core_path.exists() {
+            return Ok(Some(BundledAssets {
+                core_path,
+                plugin_dir: extracted.clone(),
+                data_dir: extracted,
+                description: format!("Mupen64Plus bundle {}", VERSION),
+            }));
+        }
+        Ok(None)
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        Ok(None)
+    }
+}
+
+fn download_and_extract(url: &str, dest: &Path) -> Result<()> {
+    fs::create_dir_all(dest)?;
+    let response = ureq::get(url)
+        .call()
+        .map_err(|err| anyhow!("failed to download {}: {}", url, err))?;
+    let mut bytes = Vec::new();
+    response
+        .into_reader()
+        .read_to_end(&mut bytes)
+        .context("failed to read downloaded bundle")?;
+    let cursor = Cursor::new(bytes);
+    let decoder = GzDecoder::new(cursor);
+    let mut archive = Archive::new(decoder);
+    archive
+        .unpack(dest)
+        .context("failed to extract Mupen64Plus bundle")?;
+    Ok(())
+}

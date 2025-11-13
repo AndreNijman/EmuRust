@@ -37,6 +37,10 @@ libraries you already have installed. It scans the locations below automatically
 - Standard system locations such as `/usr/lib/mupen64plus`, `/usr/local/lib/mupen64plus`,
   `/usr/share/mupen64plus`, `/opt/homebrew/Cellar/mupen64plus/*`, and the default `m64p` installation folders
   on Windows (`C:\Program Files\m64p` etc.)
+- **Linux bonus**: if none of the locations above contain the core, the launcher automatically downloads the
+  official `mupen64plus-bundle-linux64-2.5.9` release from GitHub, extracts it under
+  `${XDG_CACHE_HOME:-~/.cache}/retro-launcher/mupen64plus/`, and loads the core/plugins from there. That means
+  a clean Linux install can boot Nintendo 64 titles with zero manual setup or environment variables.
 
 If the launcher cannot find one of the required shared libraries it prints the exact file names it tried to
 find and exits gracefully. The first launch also creates a config directory (e.g.
