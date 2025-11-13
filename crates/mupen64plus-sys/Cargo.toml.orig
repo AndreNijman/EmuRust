@@ -1,0 +1,16 @@
+[package]
+name = "mupen64plus-sys"
+version = "0.2.0"
+edition = "2018"
+build = "build.rs"
+license = "GPL-2.0"
+keywords = ["mupen", "m64p", "n64"]
+categories = ["emulators", "external-ffi-bindings"]
+repository = "https://github.com/nanaian/mupen64plus-sys/"
+description = "Rust bindings to libmupen64plus"
+
+[dependencies]
+libloading = "0.7"
+
+[build-dependencies]
+bindgen = "0.69"

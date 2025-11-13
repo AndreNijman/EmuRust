@@ -740,8 +740,6 @@ dependencies = [
 [[package]]
 name = "mupen64plus-sys"
 version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9774875ceadb01388dc4f5183d8cb8ea02e7889920c57371e6e6ee4ce4eae44b"
 dependencies = [
  "bindgen",
  "libloading 0.7.4",

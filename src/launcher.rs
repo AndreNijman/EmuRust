@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use anyhow::{Context, Result, bail};
 use log::warn;
 
-use crate::systems::{detect_system, GameSystem};
+use crate::systems::{GameSystem, detect_system};
 
 const SUPPORTED_EXTENSIONS: [&str; 17] = [
     "gb", "gbc", "nes", "sfc", "smc", "snes", "nds", "n64", "z64", "v64", "iso", "gcm", "gcz",
@@ -92,8 +92,7 @@ fn select_game_tui(systems: Vec<SystemGroup>) -> Result<PathBuf> {
             );
         }
 
-        let console_choice =
-            prompt_number("Select a console by number: ", 1, systems.len()) - 1;
+        let console_choice = prompt_number("Select a console by number: ", 1, systems.len()) - 1;
 
         let group = &systems[console_choice];
         println!("\n-- {} --", group.system);
@@ -102,8 +101,7 @@ fn select_game_tui(systems: Vec<SystemGroup>) -> Result<PathBuf> {
         }
         println!(" 0. Back to console list");
 
-        let game_choice =
-            prompt_number("Select a game (0 to go back): ", 0, group.games.len());
+        let game_choice = prompt_number("Select a game (0 to go back): ", 0, group.games.len());
         if game_choice == 0 {
             continue;
         }
@@ -290,7 +288,9 @@ mod gui {
                             return Ok(Some(path));
                         }
                     }
-                    Event::MouseButtonDown { mouse_btn, x, y, .. } => {
+                    Event::MouseButtonDown {
+                        mouse_btn, x, y, ..
+                    } => {
                         if let Some(path) = self.handle_click(mouse_btn, x, y) {
                             return Ok(Some(path));
                         }
@@ -427,7 +427,8 @@ mod gui {
             let point = (x as usize, y as usize);
             if layout.consoles.contains(point) {
                 if let Some(idx) = layout.row_index(point.1, layout.consoles) {
-                    let absolute = (idx + self.system_scroll).min(self.systems.len().saturating_sub(1));
+                    let absolute =
+                        (idx + self.system_scroll).min(self.systems.len().saturating_sub(1));
                     if absolute != self.system_index {
                         self.system_index = absolute;
                         self.game_index = 0;
@@ -441,7 +442,8 @@ mod gui {
                     return None;
                 }
                 if let Some(idx) = layout.row_index(point.1, layout.games) {
-                    let absolute = (idx + self.game_scroll).min(self.current_games().len().saturating_sub(1));
+                    let absolute =
+                        (idx + self.game_scroll).min(self.current_games().len().saturating_sub(1));
                     self.game_index = absolute;
                     self.active_column = Column::Games;
                     if let Some(path) = self.register_click(absolute) {
@@ -459,7 +461,10 @@ mod gui {
                     return self.current_game_path();
                 }
             }
-            self.last_click = Some(ClickInfo { index, instant: now });
+            self.last_click = Some(ClickInfo {
+                index,
+                instant: now,
+            });
             None
         }
 
@@ -475,10 +480,20 @@ mod gui {
 
         fn ensure_visibility(&mut self) {
             let layout = self.layout();
-            self.system_scroll = clamp_scroll(self.system_scroll, self.system_index, self.systems.len(), layout.visible_rows);
+            self.system_scroll = clamp_scroll(
+                self.system_scroll,
+                self.system_index,
+                self.systems.len(),
+                layout.visible_rows,
+            );
             let game_len = self.current_games().len();
             if game_len > 0 {
-                self.game_scroll = clamp_scroll(self.game_scroll, self.game_index, game_len, layout.visible_rows);
+                self.game_scroll = clamp_scroll(
+                    self.game_scroll,
+                    self.game_index,
+                    game_len,
+                    layout.visible_rows,
+                );
             } else {
                 self.game_scroll = 0;
                 self.game_index = 0;
@@ -507,10 +522,7 @@ mod gui {
                 width: games_width,
                 height: panel_height,
             };
-            let visible_rows = panel_height
-                .saturating_sub(HEADER_GAP)
-                .max(ROW_HEIGHT)
-                / ROW_HEIGHT;
+            let visible_rows = panel_height.saturating_sub(HEADER_GAP).max(ROW_HEIGHT) / ROW_HEIGHT;
             let footer_top = height.saturating_sub(FOOTER_HEIGHT - 12);
             Layout {
                 consoles,
@@ -567,21 +579,23 @@ mod gui {
                 let y = layout.consoles.y + HEADER_GAP + row * ROW_HEIGHT;
                 let selected = idx == self.system_index;
                 if selected {
-                    let color = if is_active { HIGHLIGHT_ACTIVE } else { HIGHLIGHT_INACTIVE };
-                    self.fill_rect(layout.consoles.x + 6, y, layout.consoles.width - 12, ROW_HEIGHT - 4, color);
+                    let color = if is_active {
+                        HIGHLIGHT_ACTIVE
+                    } else {
+                        HIGHLIGHT_INACTIVE
+                    };
+                    self.fill_rect(
+                        layout.consoles.x + 6,
+                        y,
+                        layout.consoles.width - 12,
+                        ROW_HEIGHT - 4,
+                        color,
+                    );
                 }
                 let group = &self.systems[idx];
-                let title = format!(
-                    "{} ({})",
-                    group.system.label(),
-                    group.games.len()
-                );
+                let title = format!("{} ({})", group.system.label(), group.games.len());
                 let text_color = if selected {
-                    if is_active {
-                        TEXT_COLOR
-                    } else {
-                        0xFFE0E6FF
-                    }
+                    if is_active { TEXT_COLOR } else { 0xFFE0E6FF }
                 } else {
                     TEXT_COLOR
                 };
@@ -610,8 +624,18 @@ mod gui {
                 let y = layout.games.y + HEADER_GAP + row * ROW_HEIGHT;
                 let selected = idx == self.game_index;
                 if selected {
-                    let color = if is_active { HIGHLIGHT_ACTIVE } else { HIGHLIGHT_INACTIVE };
-                    self.fill_rect(layout.games.x + 6, y, layout.games.width - 12, ROW_HEIGHT - 4, color);
+                    let color = if is_active {
+                        HIGHLIGHT_ACTIVE
+                    } else {
+                        HIGHLIGHT_INACTIVE
+                    };
+                    self.fill_rect(
+                        layout.games.x + 6,
+                        y,
+                        layout.games.width - 12,
+                        ROW_HEIGHT - 4,
+                        color,
+                    );
                 }
                 let name = self.systems[self.system_index].games[idx].name.clone();
                 let text_color = if selected && is_active {
@@ -626,11 +650,19 @@ mod gui {
         }
 
         fn draw_footer(&mut self, y: usize) {
-            let instructions = "Arrow keys navigate, Enter launches, Esc cancels, double-click a game to launch.";
+            let instructions =
+                "Arrow keys navigate, Enter launches, Esc cancels, double-click a game to launch.";
             self.draw_text(PADDING, y, instructions, FOOTER_TEXT);
         }
 
-        fn fill_rect(&mut self, start_x: usize, start_y: usize, width: usize, height: usize, color: u32) {
+        fn fill_rect(
+            &mut self,
+            start_x: usize,
+            start_y: usize,
+            width: usize,
+            height: usize,
+            color: u32,
+        ) {
             let frame_width = WIDTH as usize;
             let frame_height = HEIGHT as usize;
             let max_y = (start_y + height).min(frame_height);
@@ -681,7 +713,11 @@ mod gui {
 
         fn present_frame(&mut self) -> Result<()> {
             self.texture
-                .update(None, cast_slice(&self.frame_buffer), (WIDTH as usize * 4) as usize)
+                .update(
+                    None,
+                    cast_slice(&self.frame_buffer),
+                    (WIDTH as usize * 4) as usize,
+                )
                 .map_err(|err| anyhow!(err))?;
             self.canvas.clear();
             self.canvas
@@ -695,10 +731,7 @@ mod gui {
     impl Panel {
         fn contains(&self, point: (usize, usize)) -> bool {
             let (x, y) = point;
-            x >= self.x
-                && x < self.x + self.width
-                && y >= self.y
-                && y < self.y + self.height
+            x >= self.x && x < self.x + self.width && y >= self.y && y < self.y + self.height
         }
     }
 

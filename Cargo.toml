@@ -25,3 +25,4 @@ libloading = "0.9"
 
 [patch.crates-io]
 gameboy_core = { path = "crates/gameboy_core" }
+mupen64plus-sys = { path = "crates/mupen64plus-sys" }
