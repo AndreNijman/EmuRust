@@ -47,7 +47,7 @@ struct Cli {
     #[arg(long, default_value_t = true)]
     limit_fps: bool,
 
-    /// Path to a PlayStation BIOS image (fallbacks to PS1_BIOS/PSX_BIOS env vars + bios/ps1/)
+    /// Path to a PlayStation BIOS image (fallbacks to PS1_BIOS/PSX_BIOS env vars + bios/)
     #[arg(long)]
     ps1_bios: Option<PathBuf>,
 }
@@ -56,7 +56,9 @@ fn main() -> Result<()> {
     env_logger::init();
     let cli = Cli::parse();
     let games_dir = Path::new("games");
+    let bios_dir = Path::new("bios");
     fs::create_dir_all(games_dir).context("failed to create games directory")?;
+    fs::create_dir_all(bios_dir).context("failed to create bios directory")?;
 
     let rom_path = match &cli.rom {
         Some(path) => path.clone(),

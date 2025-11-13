@@ -747,30 +747,23 @@ fn resolve_bios_path(bios_override: Option<PathBuf>) -> Result<PathBuf> {
     }
 
     bail!(
-        "PlayStation BIOS not found. Pass --ps1-bios, set PS1_BIOS/PSX_BIOS, or place SCPH1001/SCPH5501 under bios/ps1/."
+        "PlayStation BIOS not found. Pass --ps1-bios, set PS1_BIOS/PSX_BIOS, or place SCPH1001/SCPH5501 under bios/."
     );
 }
 
 fn default_bios_candidates() -> Vec<PathBuf> {
     let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    let mut bases = vec![
+    let bases = [
         PathBuf::from("bios/ps1"),
         PathBuf::from("bios"),
-        PathBuf::from("."),
-    ];
-    bases.extend([
         manifest_dir.join("bios/ps1"),
         manifest_dir.join("bios"),
-        manifest_dir.clone(),
-    ]);
+    ];
 
-    let mut paths = Vec::with_capacity(BIOS_CANDIDATE_NAMES.len() * bases.len());
-    for base in bases {
-        for name in BIOS_CANDIDATE_NAMES {
-            paths.push(base.join(name));
-        }
-    }
-    paths
+    bases
+        .into_iter()
+        .flat_map(|base| BIOS_CANDIDATE_NAMES.iter().map(move |name| base.join(name)))
+        .collect()
 }
 
 fn validate_existing_file(path: PathBuf) -> Result<PathBuf> {
