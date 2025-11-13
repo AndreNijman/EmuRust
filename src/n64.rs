@@ -271,11 +271,12 @@ fn find_plugin(
     let mut attempts = Vec::new();
     for dir in search_dirs {
         for candidate in candidates {
-            let file_name = PathBuf::from(library_filename(candidate));
-            let path = dir.join(&file_name);
-            attempts.push(path.clone());
-            if path.exists() {
-                return Ok(path);
+            for file_name in candidate_filenames(candidate) {
+                let path = dir.join(&file_name);
+                attempts.push(path.clone());
+                if path.exists() {
+                    return Ok(path);
+                }
             }
         }
     }
@@ -289,6 +290,39 @@ fn find_plugin(
         "unable to locate {kind} plugin; set {env_var} or install one of {:?} (looked in: {attempted})",
         candidates
     );
+}
+
+fn candidate_filenames(candidate: &str) -> Vec<PathBuf> {
+    let mut names = Vec::new();
+    names.push(PathBuf::from(library_filename(candidate)));
+    let plain = PathBuf::from(candidate);
+    if !names.contains(&plain) {
+        names.push(plain.clone());
+    }
+    if plain.extension().is_none() {
+        #[cfg(target_os = "linux")]
+        {
+            let so = PathBuf::from(format!("{candidate}.so"));
+            if !names.contains(&so) {
+                names.push(so);
+            }
+        }
+        #[cfg(target_os = "macos")]
+        {
+            let dylib = PathBuf::from(format!("{candidate}.dylib"));
+            if !names.contains(&dylib) {
+                names.push(dylib);
+            }
+        }
+        #[cfg(target_os = "windows")]
+        {
+            let dll = PathBuf::from(format!("{candidate}.dll"));
+            if !names.contains(&dll) {
+                names.push(dll);
+            }
+        }
+    }
+    names
 }
 
 fn env_path(var: &str) -> Option<PathBuf> {
