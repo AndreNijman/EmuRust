@@ -33,6 +33,10 @@ struct Cli {
     #[arg(long)]
     rom: Option<PathBuf>,
 
+    /// Launch a graphical launcher instead of the terminal menu
+    #[arg(long)]
+    gui: bool,
+
     /// Window scale factor for handheld systems
     #[arg(long, default_value_t = 4)]
     scale: u32,
@@ -50,7 +54,7 @@ fn main() -> Result<()> {
 
     let rom_path = match &cli.rom {
         Some(path) => path.clone(),
-        None => launcher::select_game(games_dir)?,
+        None => launcher::select_game(games_dir, cli.gui)?,
     };
 
     match detect_system(&rom_path)? {
