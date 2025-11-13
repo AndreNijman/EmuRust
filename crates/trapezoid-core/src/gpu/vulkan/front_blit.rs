@@ -40,7 +40,11 @@ use vulkano::{
     sync::GpuFuture,
 };
 
-const COMPUTE_24BIT_ROW_OPERATIONS: u32 = 512 / 3;
+const VRAM_WIDTH_WORDS: u32 = 1024;
+const VRAM_HEIGHT: u32 = 512;
+const COMPUTE_24BIT_BYTES_PER_ROW: u32 = VRAM_WIDTH_WORDS * 2;
+const COMPUTE_24BIT_PAIR_BYTES: u32 = 6;
+const COMPUTE_24BIT_ROW_OPERATIONS: u32 = COMPUTE_24BIT_BYTES_PER_ROW / COMPUTE_24BIT_PAIR_BYTES;
 const COMPUTE_LOCAL_SIZE_XY: u32 = 8;
 
 mod vs {
@@ -94,12 +98,12 @@ mod cs {
 
 layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 
-uint IN_W = 512;
-uint OUT_W = 1024;
-uint MAX_IN_X = (512 * 4 / 3) - 1;
-
-// perform a whole operation each time.
-uint ROW_OPERATIONS = IN_W / 3;
+const uint VRAM_WIDTH_WORDS = 1024u;
+const uint VRAM_HEIGHT = 512u;
+const uint BYTES_PER_ROW = VRAM_WIDTH_WORDS * 2u;
+const uint PAIR_BYTES = 6u;
+const uint ROW_OPERATIONS = BYTES_PER_ROW / PAIR_BYTES;
+const uint OUTPUT_ROW_WIDTH = 1024u;
 
 layout(set = 0, binding = 0) readonly buffer InData {
     uint data[];
@@ -108,28 +112,39 @@ layout(set = 0, binding = 1) writeonly buffer OutData {
     uint data[];
 } outImageData;
 
+uint read_byte(uint byte_index) {
+    uint word = inImageData.data[byte_index >> 2];
+    uint shift = (byte_index & 3u) * 8u;
+    return (word >> shift) & 0xFFu;
+}
+
+uvec3 read_rgb(uint byte_index) {
+    return uvec3(
+        read_byte(byte_index + 0u),
+        read_byte(byte_index + 1u),
+        read_byte(byte_index + 2u)
+    );
+}
+
+uint pack_color(uvec3 rgb) {
+    return 0xFF000000u | (rgb.z << 16u) | (rgb.y << 8u) | rgb.x;
+}
+
 void main() {
     uint x = gl_GlobalInvocationID.x;
     uint y = gl_GlobalInvocationID.y;
 
-    if (x >= ROW_OPERATIONS) {
+    if (x >= ROW_OPERATIONS || y >= VRAM_HEIGHT) {
         return;
     }
 
-    // convert every 3 words into 4 24bit pixels.
-    uint in1 = inImageData.data[y * IN_W + x * 3 + 0];
-    uint in2 = inImageData.data[y * IN_W + x * 3 + 1];
-    uint in3 = inImageData.data[y * IN_W + x * 3 + 2];
+    uint base_byte = y * BYTES_PER_ROW + x * PAIR_BYTES;
+    uvec3 rgb0 = read_rgb(base_byte);
+    uvec3 rgb1 = read_rgb(base_byte + 3u);
 
-    uint out1 = in1 & 0xFFFFFF;
-    uint out2 = (in1 >> 24) | ((in2 & 0xFFFF) << 8);
-    uint out3 = (in2 >> 16) | ((in3 & 0xFF) << 16);
-    uint out4 = in3 >> 8;
-
-    outImageData.data[y * OUT_W + x * 4 + 0] = out1;
-    outImageData.data[y * OUT_W + x * 4 + 1] = out2;
-    outImageData.data[y * OUT_W + x * 4 + 2] = out3;
-    outImageData.data[y * OUT_W + x * 4 + 3] = out4;
+    uint base_out = y * OUTPUT_ROW_WIDTH + x * 2u;
+    outImageData.data[base_out + 0u] = pack_color(rgb0);
+    outImageData.data[base_out + 1u] = pack_color(rgb1);
 }"
     }
 }
@@ -151,7 +166,7 @@ pub(super) struct FrontBlit {
     texture_image: Arc<Image>,
 
     texture_24bit_image: Arc<Image>,
-    texture_24bit_in_buffer: Subbuffer<[u16]>,
+    texture_24bit_in_buffer: Subbuffer<[u32]>,
     texture_24bit_out_buffer: Subbuffer<[u32]>,
     texture_24bit_desc_set: Arc<DescriptorSet>,
 
@@ -275,7 +290,7 @@ impl FrontBlit {
         )
         .unwrap();
 
-        let texture_24bit_in_buffer = Buffer::new_slice::<u16>(
+        let texture_24bit_in_buffer = Buffer::new_slice::<u32>(
             memory_allocator.clone(),
             BufferCreateInfo {
                 usage: BufferUsage::TRANSFER_DST | BufferUsage::STORAGE_BUFFER,
@@ -285,7 +300,7 @@ impl FrontBlit {
                 memory_type_filter: MemoryTypeFilter::PREFER_DEVICE,
                 ..Default::default()
             },
-            1024 * 512,
+            ((VRAM_WIDTH_WORDS * VRAM_HEIGHT) / 2) as u64,
         )
         .unwrap();
 
@@ -400,14 +415,14 @@ impl FrontBlit {
                 )
                 .unwrap();
             // Safety: Shader safety, tested
+            let group_counts = [
+                (COMPUTE_24BIT_ROW_OPERATIONS + COMPUTE_LOCAL_SIZE_XY - 1)
+                    / COMPUTE_LOCAL_SIZE_XY,
+                (VRAM_HEIGHT + COMPUTE_LOCAL_SIZE_XY - 1) / COMPUTE_LOCAL_SIZE_XY,
+                1,
+            ];
             unsafe {
-                builder
-                    .dispatch([
-                        COMPUTE_24BIT_ROW_OPERATIONS / COMPUTE_LOCAL_SIZE_XY,
-                        512 / COMPUTE_LOCAL_SIZE_XY,
-                        1,
-                    ])
-                    .unwrap()
+                builder.dispatch(group_counts).unwrap()
             };
             builder
                 .copy_buffer_to_image(CopyBufferToImageInfo::buffer_image(
