@@ -10,9 +10,13 @@ full-speed emulation there as well.
 
 - Rust 1.76+
 - SDL2 development libraries (`libsdl2-dev`, `SDL2-devel`, or `brew install sdl2`)
+- [Mupen64Plus](https://mupen64plus.org/) core + plugins (video, audio, input, and RSP). Install the `m64p`
+  bundle on Windows/macOS or the `mupen64plus`/`mupen64plus-plugins` packages on Linux so the launcher can
+  dynamically load `libmupen64plus` along with `mupen64plus-video-*`, `mupen64plus-audio-*`,
+  `mupen64plus-input-*`, and `mupen64plus-rsp-*`.
 - Dolphin emulator binary (optional, for full GameCube emulation—set `DOLPHIN_BIN` or place Dolphin on your `PATH`)
-- Nothing else—every handheld plus the Nintendo 64 core ships in-tree, so you do not need BIOS dumps
-  or an external emulator binary for those systems.
+- Nothing else—every handheld plus Nintendo 64 ships in-tree or is loaded automatically at runtime, so you do
+  not need BIOS dumps or ROM-specific patches for those systems.
 ## Setup
 
 ```bash
@@ -21,6 +25,24 @@ cargo build --release
 
 1. Place your ROMs under `games/` (a sample `tetris.gb` is already there).
 2. Just drop your ROMs (`.gb`, `.gbc`, `.nes`, `.sfc`, `.smc`, `.snes`, `.nds`, `.n64`, `.z64`, `.v64`, `.iso`, `.gcm`, `.gcz`, `.gcn`, `.rvz`, `.ciso`) into `games/`.
+
+### Nintendo 64 setup notes
+
+The N64 core embeds [Mupen64Plus](https://m64p.github.io/) directly, so the launcher simply loads the shared
+libraries you already have installed. It scans the locations below automatically:
+
+- `M64P_ROOT` (if set) plus its `lib`, `bin`, and `plugins` subdirectories
+- Explicit overrides: `M64P_CORE_LIB`, `M64P_PLUGIN_DIR`, `M64P_VIDEO`, `M64P_AUDIO`, `M64P_INPUT`, `M64P_RSP`,
+  and `M64P_DATA_DIR`
+- Standard system locations such as `/usr/lib/mupen64plus`, `/usr/local/lib/mupen64plus`,
+  `/usr/share/mupen64plus`, `/opt/homebrew/Cellar/mupen64plus/*`, and the default `m64p` installation folders
+  on Windows (`C:\Program Files\m64p` etc.)
+
+If the launcher cannot find one of the required shared libraries it prints the exact file names it tried to
+find and exits gracefully. The first launch also creates a config directory (e.g.
+`$XDG_CONFIG_HOME/retro-launcher/mupen64plus`) where Mupen64Plus keeps its own `mupen64plus.cfg`. Feel free to
+edit that file directly if you want to remap controller bindings or advanced video settings—the launcher will
+re-use it on subsequent boots.
 
 ## Usage
 
@@ -87,7 +109,7 @@ the executable is either on `PATH` or the absolute path is assigned to `DOLPHIN_
 | NES      | Built-in Rust core (`gc_nes_core`)                                                               |
 | SNES     | Built-in Rust core (`super-sabicom` via `meru-interface`)                                        |
 | Nintendo DS | Built-in Rust core (`desmume-rs`)                                                             |
-| Nintendo 64 | Built-in Rust core (R4300i interpreter with HLE RSP/RDP)                                      |
+| Nintendo 64 | Embedded [Mupen64Plus](https://mupen64plus.org/) core loaded at runtime (libmupen64plus + plugins) |
 | GameCube | **External** Dolphin binary (auto-detected via `DOLPHIN_BIN` or `PATH`); stub visualization runs only when Dolphin is missing |
 
 All of the built-in rows (Game Boy through Nintendo 64) compile directly into the launcher binary.
@@ -149,6 +171,9 @@ SNES battery-backed saves are written to a `.sav` file alongside the ROM.
 - `E` or either Shift key / controller Back-Select / left trigger: Z trigger
 - `Enter`: START
 - `Esc` / window close: exit
+  > All controller + keyboard input is routed through `mupen64plus-input-sdl`, so any SDL-compatible pad is
+  > auto-detected alongside the keyboard. Edit `mupen64plus.cfg` under the launcher’s config directory if you
+  > want to customize bindings or sensitivity—the defaults mirror the layout above.
 
 ### Controls (GameCube core)
 
