@@ -1,4 +1,6 @@
 /target
-games/
-bios/
-memcard*.mcd
+/games/*
+!/games/.gitkeep
+/bios/*
+!/bios/.gitkeep
+/memcard*.mcd
