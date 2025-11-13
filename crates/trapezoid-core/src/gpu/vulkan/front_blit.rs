@@ -40,11 +40,7 @@ use vulkano::{
     sync::GpuFuture,
 };
 
-const VRAM_WIDTH_WORDS: u32 = 1024;
-const VRAM_HEIGHT: u32 = 512;
-const VRAM_BYTES_PER_ROW: u32 = VRAM_WIDTH_WORDS * 2;
-const VRAM_WIDTH_24BIT: u32 = VRAM_BYTES_PER_ROW / 3;
-const COMPUTE_24BIT_ROW_OPERATIONS: u32 = (VRAM_WIDTH_24BIT + 1) / 2;
+const COMPUTE_24BIT_ROW_OPERATIONS: u32 = 512 / 3;
 const COMPUTE_LOCAL_SIZE_XY: u32 = 8;
 
 mod vs {
@@ -59,15 +55,13 @@ layout(location = 0) out vec2 tex_coords;
 layout(push_constant) uniform PushConstantData {
     uvec2 topleft;
     uvec2 size;
-    uvec2 extent;
 } pc;
 
 void main() {
     gl_Position = vec4(position, 0.0, 1.0);
 
-    vec2 inv_extent = vec2(pc.extent);
-    vec2 topleft = vec2(pc.topleft) / inv_extent;
-    vec2 size = vec2(pc.size) / inv_extent;
+    vec2 topleft = vec2(pc.topleft.x / 1024.0, pc.topleft.y / 512.0);
+    vec2 size = vec2(pc.size.x / 1024.0, pc.size.y / 512.0);
 
     tex_coords = (position  + 1.0) / 2.0;
     tex_coords = tex_coords * size + topleft;
@@ -100,12 +94,12 @@ mod cs {
 
 layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 
-const uint VRAM_WIDTH_WORDS = 1024u;
-const uint VRAM_HEIGHT = 512u;
-const uint BYTES_PER_ROW = VRAM_WIDTH_WORDS * 2u;
-const uint OUTPUT_ROW_WIDTH = (BYTES_PER_ROW / 3u);
-const uint PAIR_BYTES = 6u;
-const uint ROW_OPERATIONS = (OUTPUT_ROW_WIDTH + 1u) / 2u;
+uint IN_W = 512;
+uint OUT_W = 1024;
+uint MAX_IN_X = (512 * 4 / 3) - 1;
+
+// perform a whole operation each time.
+uint ROW_OPERATIONS = IN_W / 3;
 
 layout(set = 0, binding = 0) readonly buffer InData {
     uint data[];
@@ -114,42 +108,28 @@ layout(set = 0, binding = 1) writeonly buffer OutData {
     uint data[];
 } outImageData;
 
-uint read_byte(uint byte_index) {
-    uint word = inImageData.data[byte_index >> 2];
-    uint shift = (byte_index & 3u) * 8u;
-    return (word >> shift) & 0xFFu;
-}
-
-uvec3 read_rgb(uint byte_index) {
-    return uvec3(
-        read_byte(byte_index + 0u),
-        read_byte(byte_index + 1u),
-        read_byte(byte_index + 2u)
-    );
-}
-
-uint pack_color(uvec3 rgb) {
-    return 0xFF000000u | (rgb.z << 16u) | (rgb.y << 8u) | rgb.x;
-}
-
 void main() {
     uint x = gl_GlobalInvocationID.x;
     uint y = gl_GlobalInvocationID.y;
 
-    if (x >= ROW_OPERATIONS || y >= VRAM_HEIGHT) {
+    if (x >= ROW_OPERATIONS) {
         return;
     }
 
-    uint base_byte = y * BYTES_PER_ROW + x * PAIR_BYTES;
-    if (base_byte + (PAIR_BYTES - 1u) >= y * BYTES_PER_ROW + BYTES_PER_ROW) {
-        return;
-    }
-    uvec3 rgb0 = read_rgb(base_byte);
-    uvec3 rgb1 = read_rgb(base_byte + 3u);
+    // convert every 3 words into 4 24bit pixels.
+    uint in1 = inImageData.data[y * IN_W + x * 3 + 0];
+    uint in2 = inImageData.data[y * IN_W + x * 3 + 1];
+    uint in3 = inImageData.data[y * IN_W + x * 3 + 2];
 
-    uint base_out = y * OUTPUT_ROW_WIDTH + x * 2u;
-    outImageData.data[base_out + 0u] = pack_color(rgb0);
-    outImageData.data[base_out + 1u] = pack_color(rgb1);
+    uint out1 = in1 & 0xFFFFFF;
+    uint out2 = (in1 >> 24) | ((in2 & 0xFFFF) << 8);
+    uint out3 = (in2 >> 16) | ((in3 & 0xFF) << 16);
+    uint out4 = in3 >> 8;
+
+    outImageData.data[y * OUT_W + x * 4 + 0] = out1;
+    outImageData.data[y * OUT_W + x * 4 + 1] = out2;
+    outImageData.data[y * OUT_W + x * 4 + 2] = out3;
+    outImageData.data[y * OUT_W + x * 4 + 3] = out4;
 }"
     }
 }
@@ -171,7 +151,7 @@ pub(super) struct FrontBlit {
     texture_image: Arc<Image>,
 
     texture_24bit_image: Arc<Image>,
-    texture_24bit_in_buffer: Subbuffer<[u32]>,
+    texture_24bit_in_buffer: Subbuffer<[u16]>,
     texture_24bit_out_buffer: Subbuffer<[u32]>,
     texture_24bit_desc_set: Arc<DescriptorSet>,
 
@@ -288,14 +268,14 @@ impl FrontBlit {
                 image_type: ImageType::Dim2d,
                 format: Format::B8G8R8A8_UNORM,
                 usage: ImageUsage::TRANSFER_DST | ImageUsage::SAMPLED,
-                extent: [VRAM_WIDTH_24BIT, VRAM_HEIGHT, 1],
+                extent: [1024, 512, 1],
                 ..Default::default()
             },
             AllocationCreateInfo::default(),
         )
         .unwrap();
 
-        let texture_24bit_in_buffer = Buffer::new_slice::<u32>(
+        let texture_24bit_in_buffer = Buffer::new_slice::<u16>(
             memory_allocator.clone(),
             BufferCreateInfo {
                 usage: BufferUsage::TRANSFER_DST | BufferUsage::STORAGE_BUFFER,
@@ -305,7 +285,7 @@ impl FrontBlit {
                 memory_type_filter: MemoryTypeFilter::PREFER_DEVICE,
                 ..Default::default()
             },
-            ((VRAM_WIDTH_WORDS * VRAM_HEIGHT) / 2) as u64,
+            1024 * 512,
         )
         .unwrap();
 
@@ -319,7 +299,7 @@ impl FrontBlit {
                 memory_type_filter: MemoryTypeFilter::PREFER_DEVICE,
                 ..Default::default()
             },
-            (VRAM_WIDTH_24BIT * VRAM_HEIGHT) as u64,
+            1024 * 512,
         )
         .unwrap();
 
@@ -384,7 +364,6 @@ impl FrontBlit {
         dest_image: Arc<Image>,
         topleft: [u32; 2],
         size: [u32; 2],
-        source_extent: [u32; 2],
         is_24bit_color_depth: bool,
         mut in_future: IF,
     ) -> CommandBufferExecFuture<IF>
@@ -421,14 +400,14 @@ impl FrontBlit {
                 )
                 .unwrap();
             // Safety: Shader safety, tested
-            let group_counts = [
-                (COMPUTE_24BIT_ROW_OPERATIONS + COMPUTE_LOCAL_SIZE_XY - 1)
-                    / COMPUTE_LOCAL_SIZE_XY,
-                (VRAM_HEIGHT + COMPUTE_LOCAL_SIZE_XY - 1) / COMPUTE_LOCAL_SIZE_XY,
-                1,
-            ];
             unsafe {
-                builder.dispatch(group_counts).unwrap()
+                builder
+                    .dispatch([
+                        COMPUTE_24BIT_ROW_OPERATIONS / COMPUTE_LOCAL_SIZE_XY,
+                        512 / COMPUTE_LOCAL_SIZE_XY,
+                        1,
+                    ])
+                    .unwrap()
             };
             builder
                 .copy_buffer_to_image(CopyBufferToImageInfo::buffer_image(
@@ -487,11 +466,7 @@ impl FrontBlit {
         )
         .unwrap();
 
-        let push_constants = vs::PushConstantData {
-            topleft,
-            size,
-            extent: source_extent,
-        };
+        let push_constants = vs::PushConstantData { topleft, size };
 
         builder
             .begin_render_pass(
