@@ -7,9 +7,9 @@ mod launcher;
 mod n64;
 mod nds;
 mod nes;
+mod ps1;
 mod rtc;
 mod snes;
-mod ps1;
 mod systems;
 
 use std::fs;
