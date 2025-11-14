@@ -81,6 +81,7 @@ pub fn run(rom: &Path, bios_root: &Path, scale: u32, limit_fps: bool) -> Result<
             mouse_enabled: false,
             #[cfg(feature = "zx-embedded-roms")]
             load_default_rom: use_embedded_rom,
+            autoload_enabled: true,
         },
         SpectrumHostContext,
     )

@@ -98,9 +98,11 @@ open-source ROMs embedded inside the ZX Spectrum core, so you can boot tapes out
 Games themselves live in `games/` alongside every other system. The launcher accepts `.tap`,
 standard-speed `.tzx`, and `.sna` snapshots for Spectrum titles. Tapes are automatically inserted
 and start playing as soon as the emulator boots, including fast-loading support so you can reach
-the game without manual `LOAD ""` loops. Snapshots boot straight into the saved state. `.tzx`
-support currently covers only standard-speed data blocks—if you bump into an unsupported block ID
-just convert the tape to `.tap` (via `tzx2tap`/`czxtools`) and drop it back into `games/`.
+the game without manual `LOAD ""` loops. The launcher automatically drops into the loader state
+and issues the `LOAD ""` command for you, so tapes begin streaming immediately (press `Insert` if
+you need to restart the tape). Snapshots boot straight into the saved state. `.tzx` support
+currently covers only standard-speed data blocks—if you bump into an unsupported block ID just
+convert the tape to `.tap` (via `tzx2tap`/`czxtools`) and drop it back into `games/`.
 
 ### PlayStation setup notes
 
