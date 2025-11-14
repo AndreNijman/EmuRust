@@ -30,7 +30,7 @@ cargo build --release
 ```
 
 1. Place your ROMs under `games/` (a sample `tetris.gb` is already there).
-2. Just drop your ROMs (`.gb`, `.gbc`, `.nes`, `.sfc`, `.smc`, `.snes`, `.tap`, `.sna`, `.nds`, `.cue`, `.exe`, `.n64`, `.z64`, `.v64`, `.iso`, `.gcm`, `.gcz`, `.gcn`, `.rvz`, `.ciso`) into `games/`.
+2. Just drop your ROMs (`.gb`, `.gbc`, `.nes`, `.sfc`, `.smc`, `.snes`, `.tap`, `.tzx`, `.sna`, `.nds`, `.cue`, `.exe`, `.n64`, `.z64`, `.v64`, `.iso`, `.gcm`, `.gcz`, `.gcn`, `.rvz`, `.ciso`) into `games/`.
 
 ### Nintendo 64 setup notes
 
@@ -92,10 +92,12 @@ classic 48K ROM (`48.rom`) or the pair of 128K ROMs (`128.rom.0` and `128.rom.1`
 matched case-insensitively so existing dumps can simply be dropped into that directory. If both
 48K and 128K dumps are present the 128K machine is preferred for AY sound and memory paging.
 
-Games themselves live in `games/` alongside every other system. The launcher currently accepts
-`.tap` tape images and `.sna` snapshots for Spectrum titles. Tapes are automatically inserted and
-start playing as soon as the emulator boots, including fast-loading support so you can reach the
-game without manual `LOAD ""` loops. Snapshots boot straight into the saved state.
+Games themselves live in `games/` alongside every other system. The launcher accepts `.tap`,
+standard-speed `.tzx`, and `.sna` snapshots for Spectrum titles. Tapes are automatically inserted
+and start playing as soon as the emulator boots, including fast-loading support so you can reach
+the game without manual `LOAD ""` loops. Snapshots boot straight into the saved state. `.tzx`
+support currently covers only standard-speed data blocks—if you bump into an unsupported block ID
+just convert the tape to `.tap` (via `tzx2tap`/`czxtools`) and drop it back into `games/`.
 
 ### PlayStation setup notes
 

@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use std::thread;
 use std::time::{Duration, Instant};
 
-use anyhow::{Context, Result, anyhow, bail};
+use anyhow::{Context, Result, anyhow, bail, ensure};
 use bytemuck;
 use log::warn;
 use rustzx_core::EmulationMode;
@@ -197,12 +197,108 @@ impl SpectrumMedia {
             "tap" => Ok(SpectrumMedia::Tape(Tape::Tap(MemoryAsset::from_bytes(
                 data,
             )))),
+            "tzx" => {
+                let tap_bytes = tzx_to_tap(&data)?;
+                Ok(SpectrumMedia::Tape(Tape::Tap(MemoryAsset::from_bytes(
+                    tap_bytes,
+                ))))
+            }
             "sna" => Ok(SpectrumMedia::Snapshot(Snapshot::Sna(
                 MemoryAsset::from_bytes(data),
             ))),
             _ => bail!("unsupported ZX Spectrum format: {}", ext),
         }
     }
+}
+
+fn tzx_to_tap(bytes: &[u8]) -> Result<Vec<u8>> {
+    const MAGIC: &[u8] = b"ZXTape!\x1A";
+    ensure!(
+        bytes.len() >= MAGIC.len() + 2,
+        "TZX tape is too small to contain the header"
+    );
+    ensure!(
+        &bytes[..MAGIC.len()] == MAGIC,
+        "file does not look like a TZX tape"
+    );
+    let mut cursor = MAGIC.len() + 2; // skip version bytes
+    let mut tap = Vec::new();
+    let mut converted_blocks = 0usize;
+    while cursor < bytes.len() {
+        let block_id = bytes[cursor];
+        cursor += 1;
+        match block_id {
+            0x10 => {
+                ensure!(
+                    cursor + 4 <= bytes.len(),
+                    "TZX block truncated (standard block header)"
+                );
+                let length = u16::from_le_bytes([bytes[cursor + 2], bytes[cursor + 3]]) as usize;
+                let data_start = cursor + 4;
+                let data_end = data_start
+                    .checked_add(length)
+                    .ok_or_else(|| anyhow!("TZX block length overflows"))?;
+                ensure!(
+                    data_end <= bytes.len(),
+                    "TZX block truncated (standard block data)"
+                );
+                tap.extend_from_slice(&bytes[cursor + 2..cursor + 4]);
+                tap.extend_from_slice(&bytes[data_start..data_end]);
+                cursor = data_end;
+                converted_blocks += 1;
+            }
+            0x20 => {
+                // Pause block – ignore timing, just skip the payload
+                skip_bytes(bytes, &mut cursor, 2)?;
+            }
+            0x21 | 0x30 => {
+                let text_len = read_u8(bytes, &mut cursor)? as usize;
+                skip_bytes(bytes, &mut cursor, text_len)?;
+            }
+            0x22 => {}
+            0x32 => {
+                let text_len = read_u16(bytes, &mut cursor)? as usize;
+                skip_bytes(bytes, &mut cursor, text_len)?;
+            }
+            0x5A => {
+                // "Glue" block – fixed 9-byte payload
+                skip_bytes(bytes, &mut cursor, 9)?;
+            }
+            other => {
+                bail!(
+                    "unsupported TZX block 0x{other:02X}; convert this tape to .tap and try again"
+                );
+            }
+        }
+    }
+    ensure!(
+        converted_blocks > 0,
+        "TZX file did not contain any standard-speed data blocks"
+    );
+    Ok(tap)
+}
+
+fn skip_bytes(bytes: &[u8], cursor: &mut usize, len: usize) -> Result<()> {
+    let end = cursor
+        .checked_add(len)
+        .ok_or_else(|| anyhow!("offset overflow while parsing TZX"))?;
+    ensure!(end <= bytes.len(), "TZX block truncated (metadata)");
+    *cursor = end;
+    Ok(())
+}
+
+fn read_u8(bytes: &[u8], cursor: &mut usize) -> Result<u8> {
+    ensure!(*cursor < bytes.len(), "unexpected end of TZX tape");
+    let value = bytes[*cursor];
+    *cursor += 1;
+    Ok(value)
+}
+
+fn read_u16(bytes: &[u8], cursor: &mut usize) -> Result<u16> {
+    ensure!(*cursor + 2 <= bytes.len(), "unexpected end of TZX tape");
+    let value = u16::from_le_bytes([bytes[*cursor], bytes[*cursor + 1]]);
+    *cursor += 2;
+    Ok(value)
 }
 
 struct QuickSaveFiles {
