@@ -1,4 +1,4 @@
-# Retro Launcher (Game Boy / NES / SNES / ZX Spectrum / NDS / PlayStation / Nintendo 64 / GameCube)
+# Retro Launcher (Game Boy / NES / SNES / NDS / PlayStation / Nintendo 64 / GameCube)
 
 This project is a lightweight retro game launcher with built-in Game Boy, NES, SNES, ZX Spectrum,
 Nintendo DS, PlayStation, and Nintendo 64 emulator cores. Drop ROMs into the `games/` directory
@@ -19,10 +19,6 @@ installed so you get full-speed emulation there as well.
   GPU drivers on Windows) for the built-in PlayStation core powered by `trapezoid-core`.
 - A PlayStation BIOS (`SCPH1001.bin`, `SCPH5501.bin`, etc.) stored at `bios/ps1/` or pointed to with the
   `PS1_BIOS`/`PSX_BIOS` environment variable (or `--ps1-bios` on the CLI).
-- (Optional) ZX Spectrum ROM dumps stored under `bios/zx/` (`48.rom` for Sinclair 48K or
-  `128.rom.0`/`128.rom.1` for Sinclair 128K). Filenames are matched case-insensitively so you can keep
-  your existing dumps. If you do not provide any, the launcher automatically falls back to the
-  built-in ROMs shipped inside the ZX Spectrum core.
 - Nothing else—every handheld plus Nintendo 64 ships in-tree or is loaded automatically at runtime, so you do
   not need BIOS dumps or ROM-specific patches for those systems.
 ## Setup
@@ -32,7 +28,7 @@ cargo build --release
 ```
 
 1. Place your ROMs under `games/` (a sample `tetris.gb` is already there).
-2. Just drop your ROMs (`.gb`, `.gbc`, `.nes`, `.sfc`, `.smc`, `.snes`, `.tap`, `.tzx`, `.sna`, `.nds`, `.cue`, `.exe`, `.n64`, `.z64`, `.v64`, `.iso`, `.gcm`, `.gcz`, `.gcn`, `.rvz`, `.ciso`) into `games/`.
+2. Just drop your ROMs (`.gb`, `.gbc`, `.nes`, `.sfc`, `.smc`, `.snes`, `.nds`, `.cue`, `.exe`, `.n64`, `.z64`, `.v64`, `.iso`, `.gcm`, `.gcz`, `.gcn`, `.rvz`, `.ciso`) into `games/`.
 
 ### Nintendo 64 setup notes
 
@@ -86,23 +82,6 @@ cargo run --release -- --rom "games/Crash Bandicoot.cue" --ps1-bios bios/ps1/scp
 
 > **Frame pacing**: Windows default to ~60 FPS so titles run at their intended speed. Pass
 > `--limit-fps=false` only if you explicitly want uncapped rendering (useful for debugging).
-
-### ZX Spectrum setup notes
-
-ZX Spectrum ROM dumps can be dropped under `bios/zx/` (48K = `48.rom`, 128K = `128.rom.0` and
-`128.rom.1`). Filenames are matched case-insensitively so existing dumps can simply be copied into
-that directory. If both 48K and 128K dumps are present the 128K machine is preferred for AY sound
-and memory paging. When no dumps are available the launcher automatically falls back to the
-open-source ROMs embedded inside the ZX Spectrum core, so you can boot tapes out of the box.
-
-Games themselves live in `games/` alongside every other system. The launcher accepts `.tap`,
-standard-speed `.tzx`, and `.sna` snapshots for Spectrum titles. Tapes are automatically inserted
-and start playing as soon as the emulator boots, including fast-loading support so you can reach
-the game without manual `LOAD ""` loops. The launcher automatically drops into the loader state
-and issues the `LOAD ""` command for you, so tapes begin streaming immediately (press `Insert` if
-you need to restart the tape). Snapshots boot straight into the saved state. `.tzx` support
-currently covers only standard-speed data blocks—if you bump into an unsupported block ID just
-convert the tape to `.tap` (via `tzx2tap`/`czxtools`) and drop it back into `games/`.
 
 ### PlayStation setup notes
 
@@ -162,7 +141,6 @@ the executable is either on `PATH` or the absolute path is assigned to `DOLPHIN_
 | Game Boy | Built-in Rust core (`gameboy_core` patched in-tree)                                              |
 | NES      | Built-in Rust core (`gc_nes_core`)                                                               |
 | SNES     | Built-in Rust core (`super-sabicom` via `meru-interface`)                                        |
-| ZX Spectrum | Built-in Rust core (`rustzx-core`)                                                             |
 | Nintendo DS | Built-in Rust core (`desmume-rs`)                                                             |
 | PlayStation | Built-in [`trapezoid-core`](https://crates.io/crates/trapezoid-core`) + Vulkan renderer (via `vulkano`/`winit`) |
 | Nintendo 64 | Embedded [Mupen64Plus](https://mupen64plus.org/) core loaded at runtime (libmupen64plus + plugins) |
@@ -202,20 +180,6 @@ you’ll just see the metadata overlay and placeholder graphics.
 - `Right Shift` (or `Space`/`Backspace`): SELECT
 
 SNES battery-backed saves are written to a `.sav` file alongside the ROM.
-
-### Controls (ZX Spectrum core)
-
-- The PC keyboard maps 1:1 to the Sinclair keyboard matrix (`Shift`, letters, digits, space, and
-  `Ctrl` → Symbol Shift). Arrow keys, `Caps Lock`, `Backspace`, and `End` emit the expected
-  Sinclair compound keys (Caps Shift + digit combos).
-- `Insert`: start/rewind the current tape, `Delete`: stop tape playback.
-- `F3`/`F4`/`F5`: switch between 1×, 2×, and uncapped emulation speed; `F1`/`F2` quick-save and
-  quick-load a pair of `.sna` snapshots in the working directory.
-- Controllers: the d-pad or left stick drives a Kempston joystick, `A`/`B`/`X`/`Y` all trigger the
-  fire button, `Start` sends ENTER, and `Select` sends SPACE to keep in-game menus reachable.
-
-Kempston mouse input is not enabled in the launcher, so a regular mouse continues to work as the
-system cursor instead of being captured.
 
 ### Controls (Nintendo DS core)
 
