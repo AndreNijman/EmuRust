@@ -425,6 +425,12 @@ impl SpectrumFrontend {
                         if repeat {
                             continue;
                         }
+                        if matches!(code, Keycode::Return | Keycode::KpEnter) {
+                            // Make sure Symbol Shift isn't latched so Enter registers cleanly
+                            emulator.send_key(ZXKey::SymShift, false);
+                            // hold Caps Shift so Enter works in all BASIC modes
+                            emulator.send_key(ZXKey::Shift, true);
+                        }
                         match handle_key_down(emulator, code, quick_files, &mut speed)? {
                             EventControl::Continue => {}
                             EventControl::Quit => {
@@ -437,6 +443,9 @@ impl SpectrumFrontend {
                         keycode: Some(code),
                         ..
                     } => {
+                        if matches!(code, Keycode::Return | Keycode::KpEnter) {
+                            emulator.send_key(ZXKey::Shift, false);
+                        }
                         handle_key_up(emulator, code);
                     }
                     _ => {}
