@@ -40,7 +40,10 @@ use vulkano::{
     sync::GpuFuture,
 };
 
-const COMPUTE_24BIT_ROW_OPERATIONS: u32 = 512 / 3;
+const VRAM_WIDTH_WORDS: u32 = 1024;
+const VRAM_HEIGHT: u32 = 512;
+const VRAM_BYTES_PER_ROW: u32 = VRAM_WIDTH_WORDS * 2;
+const VRAM_WIDTH_24BIT: u32 = VRAM_BYTES_PER_ROW / 3;
 const COMPUTE_LOCAL_SIZE_XY: u32 = 8;
 
 mod vs {
@@ -55,13 +58,15 @@ layout(location = 0) out vec2 tex_coords;
 layout(push_constant) uniform PushConstantData {
     uvec2 topleft;
     uvec2 size;
+    uvec2 extent;
 } pc;
 
 void main() {
     gl_Position = vec4(position, 0.0, 1.0);
 
-    vec2 topleft = vec2(pc.topleft.x / 1024.0, pc.topleft.y / 512.0);
-    vec2 size = vec2(pc.size.x / 1024.0, pc.size.y / 512.0);
+    vec2 inv_extent = vec2(pc.extent);
+    vec2 topleft = vec2(pc.topleft) / inv_extent;
+    vec2 size = vec2(pc.size) / inv_extent;
 
     tex_coords = (position  + 1.0) / 2.0;
     tex_coords = tex_coords * size + topleft;
@@ -94,12 +99,10 @@ mod cs {
 
 layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 
-uint IN_W = 512;
-uint OUT_W = 1024;
-uint MAX_IN_X = (512 * 4 / 3) - 1;
-
-// perform a whole operation each time.
-uint ROW_OPERATIONS = IN_W / 3;
+const uint VRAM_WIDTH_WORDS = 1024u;
+const uint VRAM_HEIGHT = 512u;
+const uint BYTES_PER_ROW = VRAM_WIDTH_WORDS * 2u;
+const uint PIXELS_PER_ROW = BYTES_PER_ROW / 3u;
 
 layout(set = 0, binding = 0) readonly buffer InData {
     uint data[];
@@ -108,28 +111,40 @@ layout(set = 0, binding = 1) writeonly buffer OutData {
     uint data[];
 } outImageData;
 
+uint read_byte(uint byte_index) {
+    uint word = inImageData.data[byte_index >> 2];
+    uint shift = (byte_index & 3u) * 8u;
+    return (word >> shift) & 0xFFu;
+}
+
+uvec3 read_rgb(uint byte_index) {
+    return uvec3(
+        read_byte(byte_index + 0u),
+        read_byte(byte_index + 1u),
+        read_byte(byte_index + 2u)
+    );
+}
+
+uint pack_color(uvec3 rgb) {
+    return 0xFF000000u | (rgb.z << 16u) | (rgb.y << 8u) | rgb.x;
+}
+
 void main() {
     uint x = gl_GlobalInvocationID.x;
     uint y = gl_GlobalInvocationID.y;
 
-    if (x >= ROW_OPERATIONS) {
+    if (x >= PIXELS_PER_ROW || y >= VRAM_HEIGHT) {
         return;
     }
 
-    // convert every 3 words into 4 24bit pixels.
-    uint in1 = inImageData.data[y * IN_W + x * 3 + 0];
-    uint in2 = inImageData.data[y * IN_W + x * 3 + 1];
-    uint in3 = inImageData.data[y * IN_W + x * 3 + 2];
+    uint base_byte = y * BYTES_PER_ROW + x * 3u;
+    uint row_end = (y + 1u) * BYTES_PER_ROW;
+    if (base_byte + 2u >= row_end) {
+        return;
+    }
 
-    uint out1 = in1 & 0xFFFFFF;
-    uint out2 = (in1 >> 24) | ((in2 & 0xFFFF) << 8);
-    uint out3 = (in2 >> 16) | ((in3 & 0xFF) << 16);
-    uint out4 = in3 >> 8;
-
-    outImageData.data[y * OUT_W + x * 4 + 0] = out1;
-    outImageData.data[y * OUT_W + x * 4 + 1] = out2;
-    outImageData.data[y * OUT_W + x * 4 + 2] = out3;
-    outImageData.data[y * OUT_W + x * 4 + 3] = out4;
+    uint color = pack_color(read_rgb(base_byte));
+    outImageData.data[y * PIXELS_PER_ROW + x] = color;
 }"
     }
 }
@@ -151,7 +166,7 @@ pub(super) struct FrontBlit {
     texture_image: Arc<Image>,
 
     texture_24bit_image: Arc<Image>,
-    texture_24bit_in_buffer: Subbuffer<[u16]>,
+    texture_24bit_in_buffer: Subbuffer<[u32]>,
     texture_24bit_out_buffer: Subbuffer<[u32]>,
     texture_24bit_desc_set: Arc<DescriptorSet>,
 
@@ -268,14 +283,14 @@ impl FrontBlit {
                 image_type: ImageType::Dim2d,
                 format: Format::B8G8R8A8_UNORM,
                 usage: ImageUsage::TRANSFER_DST | ImageUsage::SAMPLED,
-                extent: [1024, 512, 1],
+                extent: [VRAM_WIDTH_24BIT, VRAM_HEIGHT, 1],
                 ..Default::default()
             },
             AllocationCreateInfo::default(),
         )
         .unwrap();
 
-        let texture_24bit_in_buffer = Buffer::new_slice::<u16>(
+        let texture_24bit_in_buffer = Buffer::new_slice::<u32>(
             memory_allocator.clone(),
             BufferCreateInfo {
                 usage: BufferUsage::TRANSFER_DST | BufferUsage::STORAGE_BUFFER,
@@ -285,7 +300,7 @@ impl FrontBlit {
                 memory_type_filter: MemoryTypeFilter::PREFER_DEVICE,
                 ..Default::default()
             },
-            1024 * 512,
+            ((VRAM_WIDTH_WORDS * VRAM_HEIGHT) / 2) as u64,
         )
         .unwrap();
 
@@ -299,7 +314,7 @@ impl FrontBlit {
                 memory_type_filter: MemoryTypeFilter::PREFER_DEVICE,
                 ..Default::default()
             },
-            1024 * 512,
+            (VRAM_WIDTH_24BIT * VRAM_HEIGHT) as u64,
         )
         .unwrap();
 
@@ -363,7 +378,8 @@ impl FrontBlit {
         &mut self,
         dest_image: Arc<Image>,
         topleft: [u32; 2],
-        size: [u32; 2],
+        sample_size: [u32; 2],
+        source_extent: [u32; 2],
         is_24bit_color_depth: bool,
         mut in_future: IF,
     ) -> CommandBufferExecFuture<IF>
@@ -400,14 +416,13 @@ impl FrontBlit {
                 )
                 .unwrap();
             // Safety: Shader safety, tested
+            let dispatch = [
+                (VRAM_WIDTH_24BIT + COMPUTE_LOCAL_SIZE_XY - 1) / COMPUTE_LOCAL_SIZE_XY,
+                (VRAM_HEIGHT + COMPUTE_LOCAL_SIZE_XY - 1) / COMPUTE_LOCAL_SIZE_XY,
+                1,
+            ];
             unsafe {
-                builder
-                    .dispatch([
-                        COMPUTE_24BIT_ROW_OPERATIONS / COMPUTE_LOCAL_SIZE_XY,
-                        512 / COMPUTE_LOCAL_SIZE_XY,
-                        1,
-                    ])
-                    .unwrap()
+                builder.dispatch(dispatch).unwrap()
             };
             builder
                 .copy_buffer_to_image(CopyBufferToImageInfo::buffer_image(
@@ -466,7 +481,11 @@ impl FrontBlit {
         )
         .unwrap();
 
-        let push_constants = vs::PushConstantData { topleft, size };
+        let push_constants = vs::PushConstantData {
+            topleft,
+            size: sample_size,
+            extent: source_extent,
+        };
 
         builder
             .begin_render_pass(

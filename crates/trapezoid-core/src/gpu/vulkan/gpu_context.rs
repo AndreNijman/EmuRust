@@ -46,6 +46,10 @@ use crate::gpu::DrawingTextureParams;
 use crate::gpu::DrawingVertex;
 use crate::gpu::GpuStateSnapshot;
 
+const VRAM_WIDTH: u32 = 1024;
+const VRAM_HEIGHT: u32 = 512;
+const VRAM_WIDTH_24BIT: u32 = (VRAM_WIDTH * 2) / 3;
+
 use std::sync::Arc;
 use std::{ops::Range, sync::mpsc};
 
@@ -1190,8 +1194,8 @@ impl GpuContext {
         self.check_and_flush_buffered_draws(None);
         self.flush_command_builder();
 
-        let (mut topleft, size) = if full_vram {
-            ([0; 2], [1024, 512])
+        let (topleft, size) = if full_vram {
+            ([0; 2], [VRAM_WIDTH, VRAM_HEIGHT])
         } else {
             // (((X2-X1)/cycles_per_pix)+2) AND NOT 3
             let mut horizontal_size = (((state_snapshot.display_horizontal_range.1
@@ -1221,10 +1225,14 @@ impl GpuContext {
             )
         };
 
-        // the rendering offset is more of a byte offset than pixel offset
-        // so in 24bit mode, we have to change that.
-        if gpu_stat.is_24bit_color_depth() {
-            topleft[0] = (topleft[0] * 2) / 3;
+        let mut sample_topleft = topleft;
+        let mut sample_size = size;
+        let mut source_extent = [VRAM_WIDTH, VRAM_HEIGHT];
+        let is_24bit = gpu_stat.is_24bit_color_depth() && !full_vram;
+        if is_24bit {
+            sample_topleft[0] = ((sample_topleft[0] as u64) * 2 / 3) as u32;
+            sample_size[0] = (((sample_size[0] as u64) * 2) / 3).max(1) as u32;
+            source_extent[0] = VRAM_WIDTH_24BIT;
         }
 
         let front_image = Image::new(
@@ -1246,9 +1254,10 @@ impl GpuContext {
         self.front_blit
             .blit(
                 front_image.clone(),
-                topleft,
-                size,
-                !full_vram && gpu_stat.is_24bit_color_depth(),
+                sample_topleft,
+                sample_size,
+                source_extent,
+                is_24bit,
                 self.gpu_future.take().unwrap(),
             )
             .then_signal_fence_and_flush()
