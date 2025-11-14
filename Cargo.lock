@@ -59,7 +59,7 @@ dependencies = [
  "jni",
  "jni-sys",
  "libc",
- "log",
+ "log 0.4.28",
  "ndk",
  "ndk-context",
  "ndk-sys",
@@ -211,7 +211,7 @@ dependencies = [
  "itertools",
  "lazy_static",
  "lazycell",
- "log",
+ "log 0.4.28",
  "prettyplease",
  "proc-macro2",
  "quote",
@@ -221,6 +221,18 @@ dependencies = [
  "syn 2.0.110",
  "which 4.4.2",
 ]
+
+[[package]]
+name = "bit_field"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ed8765909f9009617974ab6b7d332625b320b33c326b1e9321382ef1999b5d56"
+
+[[package]]
+name = "bit_field"
+version = "0.10.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1e4b40c7323adcfc0a41c4b88143ed58346ff65a288fc144329c5c45e05d70c6"
 
 [[package]]
 name = "bit_reverse"
@@ -323,7 +335,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b99da2f8558ca23c71f4fd15dc57c906239752dd27ff3c00a1d56b685b7cbfec"
 dependencies = [
  "bitflags 2.10.0",
- "log",
+ "log 0.4.28",
  "polling",
  "rustix 0.38.44",
  "slab",
@@ -692,7 +704,7 @@ version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8e8b83946072bc6677b2940bb59619480a035a10f63dd3f07f9e45c23a588c50"
 dependencies = [
- "log",
+ "log 0.4.28",
 ]
 
 [[package]]
@@ -723,7 +735,7 @@ version = "0.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1bf3c259d255ca70051b30e2e95b5446cdb8949ac4cd22c0d7fd634d89f568e2"
 dependencies = [
- "log",
+ "log 0.4.28",
  "regex",
 ]
 
@@ -737,7 +749,7 @@ dependencies = [
  "anstyle",
  "env_filter",
  "jiff",
- "log",
+ "log 0.4.28",
 ]
 
 [[package]]
@@ -854,7 +866,7 @@ dependencies = [
  "gameboy_core",
  "gc_nes_core",
  "libloading 0.9.0",
- "log",
+ "log 0.4.28",
  "meru-interface",
  "mupen64plus",
  "rvz",
@@ -866,6 +878,9 @@ dependencies = [
  "vulkano",
  "which 6.0.3",
  "winit",
+ "zinc64-core",
+ "zinc64-emu",
+ "zinc64-loader",
 ]
 
 [[package]]
@@ -884,7 +899,7 @@ dependencies = [
  "bit_reverse",
  "bitflags 1.3.2",
  "emulator_6502",
- "log",
+ "log 0.4.28",
  "simple-error",
 ]
 
@@ -1128,7 +1143,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "49cce2b81f2098e7e3efc35bc2e0a6b7abec9d34128283d7a26fa8f32a6dbb35"
 dependencies = [
  "jiff-static",
- "log",
+ "log 0.4.28",
  "portable-atomic",
  "portable-atomic-util",
  "serde_core",
@@ -1155,7 +1170,7 @@ dependencies = [
  "cfg-if",
  "combine",
  "jni-sys",
- "log",
+ "log 0.4.28",
  "thiserror 1.0.69",
  "walkdir",
  "windows-sys 0.45.0",
@@ -1275,6 +1290,15 @@ dependencies = [
 
 [[package]]
 name = "log"
+version = "0.3.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e19e8d5c34a3e0e2223db8e060f9e8264aeeb5c5fc64a4ee9965c062211c024b"
+dependencies = [
+ "log 0.4.28",
+]
+
+[[package]]
+name = "log"
 version = "0.4.28"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "34080505efa8e45a4b816c349525ebe327ceaa8559756f0356cba97ef3bf7432"
@@ -1352,7 +1376,7 @@ checksum = "01d1c78bbf1e1bc75fb501407e974af30ef50ba3518111750096fb2932c811ab"
 dependencies = [
  "bitflags 1.3.2",
  "libloading 0.7.4",
- "log",
+ "log 0.4.28",
  "mupen64plus-sys",
  "semver",
  "thiserror 1.0.69",
@@ -1374,7 +1398,7 @@ checksum = "c3f42e7bbe13d351b6bead8286a43aac9534b82bd3cc43e47037f012ebfd62d4"
 dependencies = [
  "bitflags 2.10.0",
  "jni-sys",
- "log",
+ "log 0.4.28",
  "ndk-sys",
  "num_enum",
  "raw-window-handle 0.5.2",
@@ -1985,6 +2009,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7a2d987857b319362043e95f5353c0535c1f58eec5336fdfcf626430af7def58"
 
 [[package]]
+name = "resid-rs"
+version = "1.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c4cf0a31213e31d3ecb79e1dadc41ae14a5936f7503361509df19fa2493199ea"
+dependencies = [
+ "bit_field 0.10.3",
+]
+
+[[package]]
 name = "ring"
 version = "0.17.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2045,7 +2078,7 @@ version = "0.23.35"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "533f54bc6a7d4f647e46ad909549eda97bf5afc1585190ef692b4286b198bd8f"
 dependencies = [
- "log",
+ "log 0.4.28",
  "once_cell",
  "ring",
  "rustls-pki-types",
@@ -2152,7 +2185,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b6277f0217056f77f1d8f49f2950ac6c278c0d607c45f5ee99328d792ede24ec"
 dependencies = [
  "ab_glyph",
- "log",
+ "log 0.4.28",
  "memmap2",
  "smithay-client-toolkit",
  "tiny-skia",
@@ -2321,7 +2354,7 @@ dependencies = [
  "calloop-wayland-source",
  "cursor-icon",
  "libc",
- "log",
+ "log 0.4.28",
  "memmap2",
  "rustix 0.38.44",
  "thiserror 1.0.69",
@@ -2383,7 +2416,7 @@ dependencies = [
  "bincode",
  "educe",
  "encoding_rs",
- "log",
+ "log 0.4.28",
  "meru-interface",
  "modular-bitfield",
  "schemars",
@@ -2519,7 +2552,7 @@ dependencies = [
  "arrayvec",
  "bytemuck",
  "cfg-if",
- "log",
+ "log 0.4.28",
  "tiny-skia-path",
 ]
 
@@ -2596,7 +2629,7 @@ version = "0.3.0"
 dependencies = [
  "bitflags 2.10.0",
  "byteorder",
- "log",
+ "log 0.4.28",
  "vulkano",
  "vulkano-shaders",
 ]
@@ -2639,7 +2672,7 @@ checksum = "02d1a66277ed75f640d608235660df48c8e3c19f3b4edb6a263315626cc3c01d"
 dependencies = [
  "base64 0.22.1",
  "flate2",
- "log",
+ "log 0.4.28",
  "once_cell",
  "rustls",
  "rustls-pki-types",
@@ -2938,7 +2971,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "34949b42822155826b41db8e5d0c1be3a2bd296c747577a43a3e6daefc296142"
 dependencies = [
  "dlib",
- "log",
+ "log 0.4.28",
  "once_cell",
  "pkg-config",
 ]
@@ -3409,7 +3442,7 @@ checksum = "d039de8032a9a8856a6be89cea3e5d12fdd82306ab7c94d74e6deab2460651c5"
 dependencies = [
  "bitflags 2.10.0",
  "dlib",
- "log",
+ "log 0.4.28",
  "once_cell",
  "xkeysym",
 ]
@@ -3533,6 +3566,38 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.110",
+]
+
+[[package]]
+name = "zinc64-core"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "65b38f3ac40a57c97d740cc1919a80fcd9be31ed24ba74141f140a35fd8effcc"
+dependencies = [
+ "bit_field 0.9.0",
+]
+
+[[package]]
+name = "zinc64-emu"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0e27cef4bdeb848603be67ff822db68ae2573c5061923383727480eba948a428"
+dependencies = [
+ "bit_field 0.9.0",
+ "log 0.3.9",
+ "resid-rs",
+ "zinc64-core",
+]
+
+[[package]]
+name = "zinc64-loader"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dfe7cf2742f81c9b6e65fd17a0e3159300934c9bb5d0cdfa181ddee61115ae44"
+dependencies = [
+ "byteorder",
+ "log 0.3.9",
+ "zinc64-emu",
 ]
 
 [[package]]

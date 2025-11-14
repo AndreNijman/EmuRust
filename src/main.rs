@@ -1,4 +1,5 @@
 mod audio;
+mod c64;
 mod controller;
 mod display;
 mod gamecube;
@@ -69,6 +70,7 @@ fn main() -> Result<()> {
         GameSystem::GameBoy => run_gameboy(&rom_path, &cli),
         GameSystem::Nes => nes::run(&rom_path, cli.scale, cli.limit_fps),
         GameSystem::Snes => snes::run(&rom_path, cli.scale, cli.limit_fps),
+        GameSystem::C64 => c64::run(&rom_path, bios_dir, cli.scale, cli.limit_fps),
         GameSystem::Nds => nds::run(&rom_path, cli.scale, cli.limit_fps),
         GameSystem::Ps1 => ps1::run(&rom_path, cli.scale, cli.limit_fps, cli.ps1_bios.clone()),
         GameSystem::N64 => n64::run(&rom_path, cli.scale, cli.limit_fps),
