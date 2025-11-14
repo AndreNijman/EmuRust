@@ -1,4 +1,4 @@
-# Retro Launcher (Game Boy / NES / SNES / Commodore 64 / NDS / PlayStation / Nintendo 64 / GameCube)
+# Retro Launcher (Game Boy / NES / SNES / NDS / PlayStation / Nintendo 64 / GameCube)
 
 This project is a lightweight retro game launcher with built-in Game Boy, NES, SNES, ZX Spectrum,
 Nintendo DS, PlayStation, and Nintendo 64 emulator cores. Drop ROMs into the `games/` directory
@@ -19,8 +19,6 @@ installed so you get full-speed emulation there as well.
   GPU drivers on Windows) for the built-in PlayStation core powered by `trapezoid-core`.
 - A PlayStation BIOS (`SCPH1001.bin`, `SCPH5501.bin`, etc.) stored at `bios/ps1/` or pointed to with the
   `PS1_BIOS`/`PSX_BIOS` environment variable (or `--ps1-bios` on the CLI).
-- Commodore 64 ROM dumps stored under `bios/c64/` (`basic.rom`, `characters.rom`, and `kernal.rom`).
-  These files are required and must match the original C64 ROM sizes (8 KB charset, 8 KB kernal, 8 KB BASIC).
 - Nothing else—every handheld plus Nintendo 64 ships in-tree or is loaded automatically at runtime, so you do
   not need BIOS dumps or ROM-specific patches for those systems.
 ## Setup
@@ -30,7 +28,7 @@ cargo build --release
 ```
 
 1. Place your ROMs under `games/` (a sample `tetris.gb` is already there).
-2. Just drop your ROMs (`.gb`, `.gbc`, `.nes`, `.sfc`, `.smc`, `.snes`, `.prg`, `.p00`, `.bin`, `.crt`, `.tap`, `.t64`, `.nds`, `.cue`, `.exe`, `.n64`, `.z64`, `.v64`, `.iso`, `.gcm`, `.gcz`, `.gcn`, `.rvz`, `.ciso`) into `games/`.
+2. Just drop your ROMs (`.gb`, `.gbc`, `.nes`, `.sfc`, `.smc`, `.snes`, `.nds`, `.cue`, `.exe`, `.n64`, `.z64`, `.v64`, `.iso`, `.gcm`, `.gcz`, `.gcn`, `.rvz`, `.ciso`) into `games/`.
 
 ### Nintendo 64 setup notes
 
@@ -84,15 +82,6 @@ cargo run --release -- --rom "games/Crash Bandicoot.cue" --ps1-bios bios/ps1/scp
 
 > **Frame pacing**: Windows default to ~60 FPS so titles run at their intended speed. Pass
 > `--limit-fps=false` only if you explicitly want uncapped rendering (useful for debugging).
-
-### Commodore 64 setup notes
-
-Place the required ROM dumps (`basic.rom`, `characters.rom`, and `kernal.rom`) under
-`bios/c64/`. The launcher refuses to boot C64 titles until all three ROMs are present and the file
-sizes match the original 8 KB images. Games live in `games/` alongside every other system. The
-built-in loader accepts `.prg`, `.p00`, `.bin`, `.crt`, `.tap`, and `.t64` images and automatically
-autostarts whatever you select. Tape images start running immediately—no need to manually type
-`LOAD""`.
 
 ### PlayStation setup notes
 
@@ -152,7 +141,6 @@ the executable is either on `PATH` or the absolute path is assigned to `DOLPHIN_
 | Game Boy | Built-in Rust core (`gameboy_core` patched in-tree)                                              |
 | NES      | Built-in Rust core (`gc_nes_core`)                                                               |
 | SNES     | Built-in Rust core (`super-sabicom` via `meru-interface`)                                        |
-| Commodore 64 | Built-in Rust core (`zinc64-emu`)                                                            |
 | Nintendo DS | Built-in Rust core (`desmume-rs`)                                                             |
 | PlayStation | Built-in [`trapezoid-core`](https://crates.io/crates/trapezoid-core`) + Vulkan renderer (via `vulkano`/`winit`) |
 | Nintendo 64 | Embedded [Mupen64Plus](https://mupen64plus.org/) core loaded at runtime (libmupen64plus + plugins) |
@@ -192,18 +180,6 @@ you’ll just see the metadata overlay and placeholder graphics.
 - `Right Shift` (or `Space`/`Backspace`): SELECT
 
 SNES battery-backed saves are written to a `.sav` file alongside the ROM.
-
-### Controls (Commodore 64 core)
-
-- PC keyboard maps 1:1 to the C64 keyboard. `Shift` keys control the two C64 shifts, `Ctrl`
-  toggles C64 CTRL, `Esc` acts as RUN/STOP, and `Home` maps to HOME/CLR. Arrow keys map to the
-  cursor keys (hold Shift with the arrow keys for the alternate directions just like on real
-  hardware).
-- `Space`, `Enter`, function keys (`F1/F3/F5/F7`), and punctuation keys are forwarded directly.
-- Controllers: the d-pad (or left stick) drives joystick port 2, while `A/B/X/Y` all fire. `Start`
-  maps to RETURN and `Select` maps to SPACE for quick in-game prompts.
-
-Tape/disk images autostart after selection, so you can focus on the prompt in the program itself.
 
 ### Controls (Nintendo DS core)
 

@@ -33,7 +33,4 @@ impl AudioPlayer {
         }
     }
 
-    pub fn clear(&mut self) {
-        self.queue.clear();
-    }
 }
