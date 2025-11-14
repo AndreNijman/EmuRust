@@ -1,12 +1,12 @@
 use std::cell::RefCell;
 use std::fs::{self, File};
-use std::io::{BufRead, BufReader, Read};
+use std::io::{BufRead, BufReader, Cursor, Read};
 use std::path::Path;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-use anyhow::{Context, Result, anyhow};
+use anyhow::{Context, Result, anyhow, ensure};
 use bytemuck;
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
@@ -88,8 +88,20 @@ fn read_required_rom(dir: &Path, name: &str) -> Result<Vec<u8>> {
 }
 
 fn load_image(c64: &mut C64, rom: &Path) -> Result<()> {
-    let ext = rom.extension().and_then(|s| s.to_str());
-    let loader = Loaders::from_ext(ext).map_err(|err| anyhow!(err))?;
+    let ext = rom
+        .extension()
+        .and_then(|s| s.to_str())
+        .map(|s| s.to_ascii_lowercase());
+    if matches!(ext.as_deref(), Some("t64")) {
+        let prg = extract_prg_from_t64(rom)?;
+        let loader = Loaders::from_ext(Some("prg")).map_err(|err| anyhow!(err))?;
+        let mut reader = MemoryReader::new(prg);
+        let mut autostart = loader.autostart(&mut reader).map_err(|err| anyhow!(err))?;
+        autostart.execute(c64);
+        return Ok(());
+    }
+
+    let loader = Loaders::from_ext(ext.as_deref()).map_err(|err| anyhow!(err))?;
     let file = File::open(rom).with_context(|| format!("failed to open {}", rom.display()))?;
     let mut reader = LoaderFile::new(file);
     let mut autostart = loader.autostart(&mut reader).map_err(|err| anyhow!(err))?;
@@ -121,6 +133,95 @@ impl Reader for LoaderFile {
     fn consume(&mut self, amt: usize) {
         self.0.consume(amt)
     }
+}
+
+struct MemoryReader {
+    cursor: Cursor<Vec<u8>>,
+}
+
+impl MemoryReader {
+    fn new(data: Vec<u8>) -> Self {
+        Self {
+            cursor: Cursor::new(data),
+        }
+    }
+}
+
+impl Reader for MemoryReader {
+    fn read(&mut self, buf: &mut [u8]) -> zinc64_loader::Result<usize> {
+        use std::io::Read;
+        self.cursor.read(buf).map_err(|err| format!("{}", err))
+    }
+
+    fn read_to_end(&mut self, buf: &mut Vec<u8>) -> zinc64_loader::Result<usize> {
+        use std::io::Read;
+        self.cursor
+            .read_to_end(buf)
+            .map_err(|err| format!("{}", err))
+    }
+
+    fn read_exact(&mut self, buf: &mut [u8]) -> zinc64_loader::Result<()> {
+        use std::io::Read;
+        self.cursor
+            .read_exact(buf)
+            .map_err(|err| format!("{}", err))
+    }
+
+    fn consume(&mut self, amt: usize) {
+        use std::io::Seek;
+        let _ = self.cursor.seek(std::io::SeekFrom::Current(amt as i64));
+    }
+}
+
+fn extract_prg_from_t64(path: &Path) -> Result<Vec<u8>> {
+    let bytes = fs::read(path).with_context(|| format!("failed to read {}", path.display()))?;
+    ensure!(
+        bytes.len() >= 0x40,
+        "{} is not a valid T64 image",
+        path.display()
+    );
+    const MAGIC_PRIMARY: &[u8] = b"C64 tape image file";
+    const MAGIC_ALT: &[u8] = b"C64-TAPE-RAW";
+    ensure!(
+        bytes.starts_with(MAGIC_PRIMARY) || bytes.starts_with(MAGIC_ALT),
+        "{} is not a valid T64 image",
+        path.display()
+    );
+    let used_entries = u16::from_le_bytes([bytes[0x24], bytes[0x25]]) as usize;
+    let mut selected: Option<(usize, usize, u16)> = None;
+    for idx in 0..used_entries {
+        let base = 0x40 + idx * 0x20;
+        if base + 0x20 > bytes.len() {
+            break;
+        }
+        let file_type = bytes[base];
+        if file_type == 0x00 {
+            continue;
+        }
+        let start = u16::from_le_bytes([bytes[base + 2], bytes[base + 3]]);
+        let end = u16::from_le_bytes([bytes[base + 4], bytes[base + 5]]);
+        if end <= start {
+            continue;
+        }
+        let length = end.wrapping_sub(start) as usize + 1;
+        let offset = u32::from_le_bytes([
+            bytes[base + 8],
+            bytes[base + 9],
+            bytes[base + 10],
+            bytes[base + 11],
+        ]) as usize;
+        if offset + length > bytes.len() {
+            continue;
+        }
+        selected = Some((offset, length, start));
+        break;
+    }
+    let (offset, length, start) = selected
+        .ok_or_else(|| anyhow!("{} does not contain a usable program entry", path.display()))?;
+    let mut prg = Vec::with_capacity(length + 2);
+    prg.extend_from_slice(&start.to_le_bytes());
+    prg.extend_from_slice(&bytes[offset..offset + length]);
+    Ok(prg)
 }
 
 struct C64FrameBuffer {

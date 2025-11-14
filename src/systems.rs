@@ -46,7 +46,7 @@ pub fn detect_system(path: &Path) -> Result<GameSystem> {
         "gb" | "gbc" => Ok(GameSystem::GameBoy),
         "nes" => Ok(GameSystem::Nes),
         "sfc" | "smc" | "snes" => Ok(GameSystem::Snes),
-        "prg" | "p00" | "bin" | "crt" | "tap" => Ok(GameSystem::C64),
+        "prg" | "p00" | "bin" | "crt" | "tap" | "t64" => Ok(GameSystem::C64),
         "nds" => Ok(GameSystem::Nds),
         "cue" | "exe" => Ok(GameSystem::Ps1),
         "n64" | "z64" | "v64" => Ok(GameSystem::N64),

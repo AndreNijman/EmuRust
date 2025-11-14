@@ -30,7 +30,7 @@ cargo build --release
 ```
 
 1. Place your ROMs under `games/` (a sample `tetris.gb` is already there).
-2. Just drop your ROMs (`.gb`, `.gbc`, `.nes`, `.sfc`, `.smc`, `.snes`, `.prg`, `.p00`, `.bin`, `.crt`, `.tap`, `.nds`, `.cue`, `.exe`, `.n64`, `.z64`, `.v64`, `.iso`, `.gcm`, `.gcz`, `.gcn`, `.rvz`, `.ciso`) into `games/`.
+2. Just drop your ROMs (`.gb`, `.gbc`, `.nes`, `.sfc`, `.smc`, `.snes`, `.prg`, `.p00`, `.bin`, `.crt`, `.tap`, `.t64`, `.nds`, `.cue`, `.exe`, `.n64`, `.z64`, `.v64`, `.iso`, `.gcm`, `.gcz`, `.gcn`, `.rvz`, `.ciso`) into `games/`.
 
 ### Nintendo 64 setup notes
 
@@ -90,7 +90,7 @@ cargo run --release -- --rom "games/Crash Bandicoot.cue" --ps1-bios bios/ps1/scp
 Place the required ROM dumps (`basic.rom`, `characters.rom`, and `kernal.rom`) under
 `bios/c64/`. The launcher refuses to boot C64 titles until all three ROMs are present and the file
 sizes match the original 8 KB images. Games live in `games/` alongside every other system. The
-built-in loader accepts `.prg`, `.p00`, `.bin`, `.crt`, and `.tap` images and automatically
+built-in loader accepts `.prg`, `.p00`, `.bin`, `.crt`, `.tap`, and `.t64` images and automatically
 autostarts whatever you select. Tape images start running immediately—no need to manually type
 `LOAD""`.
 
