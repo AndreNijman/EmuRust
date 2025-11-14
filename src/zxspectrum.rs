@@ -62,9 +62,10 @@ pub fn run(rom: &Path, bios_root: &Path, scale: u32, limit_fps: bool) -> Result<
     let assets = SpectrumAssets::load(rom, bios_root)?;
     let SpectrumAssets {
         machine,
-        rom_set,
+        rom_source,
         media,
     } = assets;
+    let use_embedded_rom = matches!(rom_source, RomSource::Embedded);
     let window_title = rom
         .file_stem()
         .and_then(|s| s.to_str())
@@ -78,11 +79,15 @@ pub fn run(rom: &Path, bios_root: &Path, scale: u32, limit_fps: bool) -> Result<
             tape_fastload_enabled: true,
             kempston_enabled: true,
             mouse_enabled: false,
+            #[cfg(feature = "zx-embedded-roms")]
+            load_default_rom: use_embedded_rom,
         },
         SpectrumHostContext,
     )
     .map_err(map_core_error)?;
-    emulator.load_rom(rom_set).map_err(map_core_error)?;
+    if let RomSource::External(rom_set) = rom_source {
+        emulator.load_rom(rom_set).map_err(map_core_error)?;
+    }
     match media {
         SpectrumMedia::Tape(tape) => {
             emulator.load_tape(tape).map_err(map_core_error)?;
@@ -99,8 +104,13 @@ pub fn run(rom: &Path, bios_root: &Path, scale: u32, limit_fps: bool) -> Result<
 
 struct SpectrumAssets {
     machine: ZXMachine,
-    rom_set: SpectrumRomSet,
+    rom_source: RomSource,
     media: SpectrumMedia,
+}
+
+enum RomSource {
+    External(SpectrumRomSet),
+    Embedded,
 }
 
 impl SpectrumAssets {
@@ -108,11 +118,21 @@ impl SpectrumAssets {
         let zx_dir = bios_dir.join(ZX_SUBDIR);
         fs::create_dir_all(&zx_dir)
             .with_context(|| format!("failed to create {}", zx_dir.display()))?;
-        let (machine, rom_set) = load_machine_roms(&zx_dir)?;
+        let (machine, rom_source) = match load_machine_roms(&zx_dir) {
+            Ok((machine, rom_set)) => (machine, RomSource::External(rom_set)),
+            Err(err) => {
+                if cfg!(feature = "zx-embedded-roms") {
+                    warn!("{}; falling back to embedded 48K ZX Spectrum ROM", err);
+                    (ZXMachine::Sinclair48K, RomSource::Embedded)
+                } else {
+                    return Err(err);
+                }
+            }
+        };
         let media = SpectrumMedia::load(game)?;
         Ok(Self {
             machine,
-            rom_set,
+            rom_source,
             media,
         })
     }

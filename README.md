@@ -19,8 +19,10 @@ installed so you get full-speed emulation there as well.
   GPU drivers on Windows) for the built-in PlayStation core powered by `trapezoid-core`.
 - A PlayStation BIOS (`SCPH1001.bin`, `SCPH5501.bin`, etc.) stored at `bios/ps1/` or pointed to with the
   `PS1_BIOS`/`PSX_BIOS` environment variable (or `--ps1-bios` on the CLI).
-- ZX Spectrum ROM dumps stored under `bios/zx/` (`48.rom` for Sinclair 48K or `128.rom.0`/`128.rom.1`
-  for Sinclair 128K). Filenames are matched case-insensitively so you can keep your existing dumps.
+- (Optional) ZX Spectrum ROM dumps stored under `bios/zx/` (`48.rom` for Sinclair 48K or
+  `128.rom.0`/`128.rom.1` for Sinclair 128K). Filenames are matched case-insensitively so you can keep
+  your existing dumps. If you do not provide any, the launcher automatically falls back to the
+  built-in ROMs shipped inside the ZX Spectrum core.
 - Nothing else—every handheld plus Nintendo 64 ships in-tree or is loaded automatically at runtime, so you do
   not need BIOS dumps or ROM-specific patches for those systems.
 ## Setup
@@ -87,10 +89,11 @@ cargo run --release -- --rom "games/Crash Bandicoot.cue" --ps1-bios bios/ps1/scp
 
 ### ZX Spectrum setup notes
 
-The ZX Spectrum core relies on Sinclair ROM dumps placed under `bios/zx/`. Provide either a
-classic 48K ROM (`48.rom`) or the pair of 128K ROMs (`128.rom.0` and `128.rom.1`). Filenames are
-matched case-insensitively so existing dumps can simply be dropped into that directory. If both
-48K and 128K dumps are present the 128K machine is preferred for AY sound and memory paging.
+ZX Spectrum ROM dumps can be dropped under `bios/zx/` (48K = `48.rom`, 128K = `128.rom.0` and
+`128.rom.1`). Filenames are matched case-insensitively so existing dumps can simply be copied into
+that directory. If both 48K and 128K dumps are present the 128K machine is preferred for AY sound
+and memory paging. When no dumps are available the launcher automatically falls back to the
+open-source ROMs embedded inside the ZX Spectrum core, so you can boot tapes out of the box.
 
 Games themselves live in `games/` alongside every other system. The launcher accepts `.tap`,
 standard-speed `.tzx`, and `.sna` snapshots for Spectrum titles. Tapes are automatically inserted
